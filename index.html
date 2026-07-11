@@ -363,36 +363,33 @@ canvas{max-width:100%;}
       </div>
     </section>
 
-    <!-- ===== page: cashflow ===== -->
+    <!-- ===== page: cashflow (v8) ===== -->
     <section id="p-cf" class="hidden">
       <div class="card">
-        <h2>収支サマリー <span class="tag" id="cf-range">—</span></h2>
+        <h2>年間収支サマリー <span class="tag" id="cfYearTag"></span></h2>
         <div class="formula">
-          <div class="fbox dark">
-            <div class="lb">収支</div>
-            <div class="val" id="cf-net">—</div>
-          </div>
+          <div class="fbox dark"><div class="lb">収支</div><div class="val" id="cf-net">—</div></div>
           <div class="fop">=</div>
-          <div class="fbox blue">
-            <div class="lb">収入</div>
-            <div class="val" id="cf-inc">—</div>
-          </div>
+          <div class="fbox blue"><div class="lb">収入</div><div class="val" id="cf-inc">—</div></div>
           <div class="fop">−</div>
-          <div class="fbox pink">
-            <div class="lb">支出</div>
-            <div class="val" id="cf-exp">—</div>
-          </div>
+          <div class="fbox pink"><div class="lb">支出</div><div class="val" id="cf-exp">—</div></div>
         </div>
-        <div class="note">対象: 直近12ヶ月の記録済みデータ合計</div>
+        <div class="note" id="cfYearNote">今年の記録済みデータ合計。年が変わると自動で最新年に切り替わります。</div>
       </div>
 
       <div class="card">
-        <h2>収支推移（月別）</h2>
-        <canvas id="cfChart" height="240"></canvas>
+        <h2>月別 支出の内訳 <span class="tag" id="stackYearTag"></span> <span class="tag">積み上げ</span></h2>
+        <canvas id="cfStackChart" height="280"></canvas>
+        <div class="note">各月の棒を費目で色分け。棒の高さ＝その月の総支出、色の割合＝内訳。収入は黒い折れ線で重ねています。</div>
       </div>
 
       <div class="card">
-        <h2>年別サマリー</h2>
+        <h2>費目 × 月 ヒートマップ <span class="tag" id="heatYearTag"></span></h2>
+        <div id="heatmap" style="overflow-x:auto;"><div class="note">色が濃いほど支出が大きい月。電気代・カード代などの季節性やパターンが見えます。カード明細・レシートの取込が進むほど埋まります。</div></div>
+      </div>
+
+      <div class="card">
+        <h2>年別サマリー <span class="tag">長期の流れ</span></h2>
         <table class="t" id="yearTable">
           <thead><tr><th>年</th><th>収支</th><th style="width:26%">収入</th><th style="width:26%">支出</th></tr></thead>
           <tbody></tbody>
@@ -736,47 +733,6 @@ function render(d){
       if(!catByYear[dt.y])catByYear[dt.y]={};
       catByYear[dt.y][item]=(catByYear[dt.y][item]||0)+amt;}
   }
-  const mkeys=Object.keys(byMonth).sort();
-  const last12=mkeys.slice(-12);
-  const inc12=last12.reduce((s,k)=>s+byMonth[k].inc,0);
-  const exp12=last12.reduce((s,k)=>s+byMonth[k].exp,0);
-  $('cf-inc').textContent=yen(inc12);
-  $('cf-exp').textContent=yen(exp12);
-  $('cf-net').textContent=signed(inc12-exp12);
-  $('cf-range').textContent=last12.length?last12[0]+'〜'+last12[last12.length-1]:'—';
-
-  const thisYear=mkeys.filter(k=>k.startsWith(String(now.getFullYear())));
-  const cum=thisYear.reduce((s,k)=>s+byMonth[k].inc-byMonth[k].exp,0);
-  $('k-cf').textContent=signed(cum);
-  $('k-cf').style.color=cum>=0?'var(--green)':'var(--red)';
-  $('k-cf-sub').textContent=now.getFullYear()+'年 記録済み'+thisYear.length+'ヶ月分';
-  const lastKey=mkeys[mkeys.length-1];
-  if(lastKey){const[ly,lm]=lastKey.split('-').map(Number);
-    const behind=(now.getFullYear()*12+now.getMonth()+1)-(ly*12+lm);
-    if(behind>=2)alerts.push('<b>月次収支が'+(behind-1)+'ヶ月分未記録</b>（最終: '+lastKey+'）');}
-
-  mkChart('cfChart',{type:'bar',data:{
-    labels:last12.map(k=>k.slice(2).replace('-','/')),
-    datasets:[
-      {label:'収入',data:last12.map(k=>byMonth[k].inc),backgroundColor:'#5AB6F2',borderRadius:5},
-      {label:'支出',data:last12.map(k=>byMonth[k].exp),backgroundColor:'#F06E9C',borderRadius:5},
-      {label:'手残り',data:last12.map(k=>byMonth[k].inc-byMonth[k].exp),type:'line',borderColor:'#3A4256',backgroundColor:'#3A4256',tension:0.25,pointRadius:3,borderWidth:2.5}
-    ]},options:{plugins:{legend:{labels:{color:'#2E3440',font:{size:11}}}},
-    scales:{x:{ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
-      y:{ticks:{color:'#8A93A6',font:{size:10},callback:v=>man(v)},grid:{color:'#EDF0F7'}}}}});
-
-  /* year table */
-  const years=Object.keys(byYear).sort().reverse();
-  const maxAmt=Math.max(...years.map(y=>Math.max(byYear[y].inc,byYear[y].exp)),1);
-  $('yearTable').querySelector('tbody').innerHTML=years.map(y=>{
-    const v=byYear[y];const net=v.inc-v.exp;
-    return `<tr><td><b>${y}年</b></td>
-      <td class="num" style="color:${net>=0?'var(--green)':'var(--red)'}">${signed(net)}</td>
-      <td><div class="bar-wrap"><span class="num" style="min-width:70px;font-size:11.5px;">${man(v.inc)}円</span><div class="bar inc" style="width:${Math.round(v.inc/maxAmt*100)}%"></div></div></td>
-      <td><div class="bar-wrap"><span class="num" style="min-width:70px;font-size:11.5px;">${man(v.exp)}円</span><div class="bar exp" style="width:${Math.round(v.exp/maxAmt*100)}%"></div></div></td></tr>`;
-  }).join('');
-
-  /* ===== v7: 収支カレンダー・固定費・カテゴリ集計 ===== */
   window.__cfRows = [];
   window.__cfIncome = [];
   for(let i=1;i<d.cf.length;i++){
@@ -796,6 +752,83 @@ function render(d){
     }
   }
 
+
+  const mkeys=Object.keys(byMonth).sort();
+  const thisYearNum = now.getFullYear();
+  $('cfYearTag').textContent = thisYearNum+'年';
+  $('stackYearTag').textContent = thisYearNum+'年';
+  $('heatYearTag').textContent = thisYearNum+'年';
+
+  // 今年の月別収入・支出
+  const yInc = Array(12).fill(0), yExp = Array(12).fill(0);
+  for(const k of mkeys){
+    const [yy,mm] = k.split('-').map(Number);
+    if(yy!==thisYearNum) continue;
+    yInc[mm-1]+=byMonth[k].inc; yExp[mm-1]+=byMonth[k].exp;
+  }
+  const incSum = yInc.reduce((s,v)=>s+v,0), expSum = yExp.reduce((s,v)=>s+v,0);
+  $('cf-inc').textContent=yen(incSum);
+  $('cf-exp').textContent=yen(expSum);
+  $('cf-net').textContent=signed(incSum-expSum);
+
+  // 積み上げ棒: 費目(大分類)×月。__cfRowsが未定義でもここまでに作られている
+  const bigOrder=['住まい','食費・日用','貯蓄・投資','ローン返済','健康・美容','通信','サブスク','交通','趣味・娯楽','その他'];
+  const stackData = {};
+  bigOrder.forEach(c=>stackData[c]=Array(12).fill(0));
+  (window.__cfRows||[]).forEach(r=>{
+    if(r.y!==thisYearNum) return;
+    const bc = bigCat(r.item);
+    const key = stackData[bc] ? bc : 'その他';
+    stackData[key][r.m-1]+=r.amt;
+  });
+  const usedCats = bigOrder.filter(c=>stackData[c].some(v=>v>0));
+  mkChart('cfStackChart',{data:{
+    labels:['1','2','3','4','5','6','7','8','9','10','11','12'].map(m=>m+'月'),
+    datasets:[
+      ...usedCats.map((c,i)=>({type:'bar',label:c,data:stackData[c],backgroundColor:CAT_COLORS[bigOrder.indexOf(c)%CAT_COLORS.length],stack:'s'})),
+      {type:'line',label:'収入',data:yInc,borderColor:'#2E3440',backgroundColor:'#2E3440',borderWidth:2.5,pointRadius:3,tension:0.2}
+    ]},options:{plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:10.5},boxWidth:12,padding:8}}},
+    scales:{x:{stacked:true,ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
+      y:{stacked:true,ticks:{color:'#8A93A6',font:{size:10},callback:v=>man(v)},grid:{color:'#EDF0F7'}}}}});
+
+  // ヒートマップ: 費目×月（カテゴリ集計=購入明細ベース、なければ大分類）
+  const heatSrc = {};
+  if(window.__meisai && window.__meisai.length){
+    window.__meisai.forEach(r=>{ if(r.y!==thisYearNum)return; if(!heatSrc[r.cat])heatSrc[r.cat]=Array(12).fill(0); heatSrc[r.cat][r.m-1]+=r.amt; });
+  } else {
+    Object.assign(heatSrc, stackData);
+  }
+  const heatCats = Object.keys(heatSrc).filter(c=>heatSrc[c].some(v=>v>0)).sort((a,b)=>heatSrc[b].reduce((s,v)=>s+v,0)-heatSrc[a].reduce((s,v)=>s+v,0));
+  if(heatCats.length){
+    const maxV = Math.max(...heatCats.flatMap(c=>heatSrc[c]));
+    let html='<table class="t" style="min-width:640px;"><thead><tr><th>費目</th>';
+    for(let m=1;m<=12;m++)html+=`<th style="text-align:center;font-size:10px;">${m}月</th>`;
+    html+='<th style="text-align:right;">年計</th></tr></thead><tbody>';
+    heatCats.forEach(c=>{
+      html+=`<tr><td style="font-weight:700;font-size:11.5px;">${c}</td>`;
+      heatSrc[c].forEach(v=>{
+        const a = v>0 ? 0.12+0.75*(v/maxV) : 0;
+        const label = v>=10000 ? Math.round(v/1000)+'k' : (v>0?Math.round(v/1000*10)/10+'k':'');
+        html+=`<td style="text-align:center;font-size:10px;background:rgba(91,103,202,${a});color:${a>0.5?'#fff':'#2E3440'};">${label}</td>`;
+      });
+      html+=`<td class="num" style="font-weight:800;">${yen(heatSrc[c].reduce((s,v)=>s+v,0))}</td></tr>`;
+    });
+    html+='</tbody></table>';
+    $('heatmap').innerHTML=html;
+  }
+
+  /* year table */
+  const years=Object.keys(byYear).sort().reverse();
+  const maxAmt=Math.max(...years.map(y=>Math.max(byYear[y].inc,byYear[y].exp)),1);
+  $('yearTable').querySelector('tbody').innerHTML=years.map(y=>{
+    const v=byYear[y];const net=v.inc-v.exp;
+    return `<tr><td><b>${y}年</b></td>
+      <td class="num" style="color:${net>=0?'var(--green)':'var(--red)'}">${signed(net)}</td>
+      <td><div class="bar-wrap"><span class="num" style="min-width:70px;font-size:11.5px;">${man(v.inc)}円</span><div class="bar inc" style="width:${Math.round(v.inc/maxAmt*100)}%"></div></div></td>
+      <td><div class="bar-wrap"><span class="num" style="min-width:70px;font-size:11.5px;">${man(v.exp)}円</span><div class="bar exp" style="width:${Math.round(v.exp/maxAmt*100)}%"></div></div></td></tr>`;
+  }).join('');
+
+  /* ===== v7: 収支カレンダー・固定費・カテゴリ集計 ===== */
   /* --- 収支カレンダー --- */
   const thisY = now.getFullYear();
   $('cfCalYear').textContent = thisY + '年';
