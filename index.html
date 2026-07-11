@@ -676,17 +676,7 @@ function render(d){
     scales:{x:{stacked:false,ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
       y:{stacked:true,ticks:{color:'#8A93A6',font:{size:10},callback:v=>man(v)},grid:{color:'#EDF0F7'}}}}});
 
-  /* pie: 日本株/投信の区分（投信≒証券合計−優待株評価額の概算） */
-  if(latest){
-    const secTotal = latest.rk + latest.nikko + latest.sbi;
-    const nihonKabu = Math.min(totalVal, secTotal);
-    const toushin = Math.max(0, secTotal - nihonKabu);
-    mkChart('pieChart',{type:'doughnut',data:{
-      labels:['現金・預金','日本株（優待株）','投信・その他証券'],
-      datasets:[{data:[latest.cash+latest.em,nihonKabu,toushin],
-        backgroundColor:['#5AB6F2','#F06E9C','#43C59E'],borderWidth:2,borderColor:'#fff'}]
-    },options:{plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:11},padding:14}}},cutout:'58%'}});
-  }
+  /* pie: ポートフォリオ計算後に描画（下方へ移動） */
 
   /* ===== portfolio ===== */
   const holdings=[];
@@ -705,7 +695,20 @@ function render(d){
   $('k-port').textContent=yen(totalVal);
   $('k-port-sub').textContent=holdings.length+'銘柄'+(latest&&latest.rk+latest.nikko+latest.sbi>0?' / 証券資産の'+Math.round(totalVal/(latest.rk+latest.nikko+latest.sbi)*100)+'%':'');
   $('k-div').textContent=yen(totalDiv);
-  $('k-div-sub').textContent='月平均 '+yen(totalDiv/12);
+  const totalNet = holdings.reduce((s,h)=>s+h.divNet,0);
+  $('k-div-sub').textContent='手取り目安 '+yen(totalNet)+'（NISA非課税/特定20.315%控除）';
+
+  /* pie: 日本株/投信の区分（投信≒証券合計−優待株評価額の概算） */
+  if(latest){
+    const secTotal = latest.rk + latest.nikko + latest.sbi;
+    const nihonKabu = Math.min(totalVal, secTotal);
+    const toushin = Math.max(0, secTotal - nihonKabu);
+    mkChart('pieChart',{type:'doughnut',data:{
+      labels:['現金・預金','日本株（優待株）','投信・その他証券'],
+      datasets:[{data:[latest.cash+latest.em,nihonKabu,toushin],
+        backgroundColor:['#5AB6F2','#F06E9C','#43C59E'],borderWidth:2,borderColor:'#fff'}]
+    },options:{plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:11},padding:14}}},cutout:'58%'}});
+  }
 
   /* ===== cashflow ===== */
   const byMonth={},byYear={},catByYear={};
