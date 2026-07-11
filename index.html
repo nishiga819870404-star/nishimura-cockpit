@@ -201,6 +201,34 @@ table.t tr:hover td{background:#FAFBFE;}
   font-size:11px;font-weight:700;border-radius:5px;padding:2px 8px;margin-right:4px;
 }
 canvas{max-width:100%;}
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(30,35,60,0.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:18px;}
+.modal{background:#fff;border-radius:16px;max-width:640px;width:100%;max-height:82vh;overflow-y:auto;padding:22px;box-shadow:0 12px 40px rgba(30,40,90,0.25);}
+.modal h3{font-size:16px;font-weight:900;color:var(--header);margin-bottom:4px;}
+.modal .sub{font-size:11.5px;color:var(--dim);margin-bottom:14px;}
+.modal .close{float:right;background:#F0F2FA;border:none;border-radius:7px;padding:6px 12px;font-weight:700;cursor:pointer;color:var(--dim);}
+.badge{display:inline-block;font-size:10px;font-weight:800;border-radius:5px;padding:2px 7px;margin-left:6px;}
+.badge.ok{background:#E3F7EF;color:#1B9E77;}
+.badge.wait{background:#FFF3E0;color:#C77700;}
+.badge.unk{background:#EEE;color:#888;}
+.mrow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:13px;}
+.mrow .nm{font-weight:700;}
+.mrow .dt{font-size:11px;color:var(--dim);margin-top:2px;line-height:1.5;}
+.mrow .amt{font-weight:800;color:var(--green);white-space:nowrap;font-variant-numeric:tabular-nums;}
+.toggle{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--dim);cursor:pointer;user-select:none;margin-bottom:12px;}
+.toggle input{width:16px;height:16px;accent-color:var(--header);}
+.catchip{display:inline-block;font-size:10px;font-weight:700;border-radius:5px;padding:2px 8px;background:#F0F2FA;color:var(--header);}
+.clickable{cursor:pointer;}
+.clickable:hover{background:#F5F7FD !important;}
+/* reports */
+.replist{display:flex;flex-direction:column;gap:10px;}
+.repitem{border:1.5px solid var(--line);border-radius:11px;padding:14px 16px;cursor:pointer;background:#fff;}
+.repitem:hover{border-color:var(--header);}
+.repitem .rt{font-weight:900;color:var(--header);font-size:14px;}
+.repitem .rp{font-size:12px;color:var(--dim);margin-top:4px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.repbody{font-size:13.5px;line-height:2;}
+.repbody h4{color:var(--header);font-size:13.5px;margin:14px 0 4px;}
+.repbody p{margin-bottom:8px;}
 </style>
 </head>
 <body>
@@ -232,6 +260,8 @@ canvas{max-width:100%;}
     <input id="u-loan">
     <label>購入明細 CSV URL（任意・レシートデータ）</label>
     <input id="u-meisai">
+    <label>レポート CSV URL（任意・月次FPレポートのストック）</label>
+    <input id="u-report">
     <button class="go" id="go">ダッシュボード起動 →</button>
     <p class="note" style="margin-top:14px;">設定はURLの#以降に保存されます。起動後のURLをブックマーク／ホーム画面に追加してください。<br>※公開CSVのURLは第三者に渡さないこと。</p>
   </div>
@@ -244,6 +274,7 @@ canvas{max-width:100%;}
     <div class="navitem" data-page="p-cf"><span class="ico">💰</span>収支推移</div>
     <div class="navitem" data-page="p-detail"><span class="ico">🧾</span>費目別詳細</div>
     <div class="navitem" data-page="p-yutai"><span class="ico">🎁</span>優待・配当</div>
+    <div class="navitem" data-page="p-report"><span class="ico">📝</span>月次レポート</div>
     <div class="navitem" data-page="p-manual"><span class="ico">📖</span>使い方</div>
   </nav>
 
@@ -309,6 +340,11 @@ canvas{max-width:100%;}
           <h2>資産の構成 <span class="tag">最新月</span></h2>
           <canvas id="pieChart" height="230"></canvas>
         </div>
+        <div class="card full">
+          <h2>資産の内訳推移 <span class="tag">銀行・証券別</span></h2>
+          <canvas id="stackChart" height="150"></canvas>
+          <div class="note">毎月の棚卸しごとに層が積み上がります。青系＝現金・電子マネー、暖色系＝証券3社。</div>
+        </div>
       </div>
     </section>
 
@@ -357,6 +393,10 @@ canvas{max-width:100%;}
         <div class="note">各年の支出を費目別に100%積み上げで表示。色の割合の変化＝生活の変化。</div>
       </div>
       <div class="card">
+        <h2>費目一覧 <span class="tag">クリックで推移グラフ</span></h2>
+        <div id="itemList"></div>
+      </div>
+      <div class="card">
         <h2>支出明細（直近から100件）</h2>
         <table class="t" id="detailTable">
           <thead><tr><th>年月</th><th>費目</th><th>支払方法</th><th style="text-align:right">支出</th></tr></thead>
@@ -390,9 +430,10 @@ canvas{max-width:100%;}
       </div>
 
       <div class="card">
-        <h2>優待・配当カレンダー</h2>
+        <h2>優待・配当カレンダー <span class="tag">月をクリックで明細</span></h2>
+        <label class="toggle"><input type="checkbox" id="eligOnly"> 権利条件を達成している優待のみ表示</label>
         <div class="ycal" id="ycal"></div>
-        <div class="note">🎁＝その月に権利確定する優待銘柄。💰＝その月に支払われる配当の目安額（権利確定月＋3ヶ月で概算。実際の支払月は銘柄により異なります）。</div>
+        <div class="note">🎁＝権利確定する優待銘柄。💰＝配当支払の目安額（権利月＋3ヶ月で概算）。✅＝長期条件クリア／⏳＝あと少し／❓＝取得日不明。</div>
       </div>
 
       <div class="card">
@@ -401,6 +442,14 @@ canvas{max-width:100%;}
           <thead><tr><th>銘柄</th><th style="text-align:right">評価額</th><th style="text-align:right">年間配当</th><th>権利月</th><th>優待内容</th></tr></thead>
           <tbody></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- ===== page: report ===== -->
+    <section id="p-report" class="hidden">
+      <div class="card">
+        <h2>月次FPレポート</h2>
+        <div id="replist" class="replist"><div class="note">スプシに「レポート」シート（A列:年月 / B列:本文）を作り、CSV公開URLを設定すると、毎月のFPレポートがここに貯まっていきます。</div></div>
       </div>
     </section>
 
@@ -486,7 +535,7 @@ document.querySelectorAll('.navitem').forEach(el=>{
 let CFG = readCfg();
 if(CFG){ $('setup').classList.add('hidden'); boot(); }
 $('go').addEventListener('click',()=>{
-  const c={snap:$('u-snap').value.trim(),cf:$('u-cf').value.trim(),port:$('u-port').value.trim(),loan:$('u-loan').value.trim(),meisai:$('u-meisai').value.trim()};
+  const c={snap:$('u-snap').value.trim(),cf:$('u-cf').value.trim(),port:$('u-port').value.trim(),loan:$('u-loan').value.trim(),meisai:$('u-meisai').value.trim(),report:$('u-report').value.trim()};
   // v2互換: med設定は無視
   if(!c.snap||!c.cf||!c.port){alert('必須3つのURLを入れてください');return;}
   CFG=c;writeCfg(c);$('setup').classList.add('hidden');boot();
@@ -494,25 +543,77 @@ $('go').addEventListener('click',()=>{
 $('reload').addEventListener('click',()=>{if(CFG)boot();});
 $('reconfig').addEventListener('click',()=>{
   $('app').classList.add('hidden');$('setup').classList.remove('hidden');
-  if(CFG){$('u-snap').value=CFG.snap||'';$('u-cf').value=CFG.cf||'';$('u-port').value=CFG.port||'';$('u-loan').value=CFG.loan||'';$('u-meisai').value=CFG.meisai||'';}
+  if(CFG){$('u-snap').value=CFG.snap||'';$('u-cf').value=CFG.cf||'';$('u-port').value=CFG.port||'';$('u-loan').value=CFG.loan||'';$('u-meisai').value=CFG.meisai||'';$('u-report').value=CFG.report||'';}
 });
 
 /* ---- charts registry ---- */
 const charts={};
 function mkChart(id,cfg){ if(charts[id])charts[id].destroy(); charts[id]=new Chart($(id),cfg); }
 
-const CAT_COLORS = ['#5AB6F2','#F06E9C','#43C59E','#F5A623','#8E7CE0','#4DD0E1','#FF8A65','#AED581','#BA68C8','#90A4AE','#FFD54F','#7986CB','#E57373','#4DB6AC','#A1887F','#DCE775','#64B5F6','#F48FB1'];
+const CAT_COLORS = ['#5AB6F2','#F06E9C','#43C59E','#F5A623','#8E7CE0','#4DD0E1','#FF8A65','#AED581','#BA68C8','#90A4AE','#FFD54F','#7986CB'];
+
+/* ---- 大分類マッピング ---- */
+const CAT_RULES = [
+  ['住まい', ['家賃','固定資産税','リフォーム','住宅']],
+  ['ローン返済', ['レイク']],
+  ['貯蓄・投資', ['NISA','積立']],
+  ['通信', ['ネット代','通信費','モバイル','Povo']],
+  ['サブスク', ['Youtube','マネーフォワード','配当管理','アップル','クラウド','AIツール','Plaud','Genspark','Claude']],
+  ['健康・美容', ['ジム','病院','カット','パーソナル']],
+  ['交通', ['Suica','ガソリン']],
+  ['食費・日用', ['メルペイ','その他楽天','その他三井住友','Amazonカード','イオンカード','その他現金']],
+];
+function bigCat(item){
+  for(const [cat, keys] of CAT_RULES){
+    if(keys.some(k=>String(item).includes(k))) return cat;
+  }
+  return 'その他';
+}
+
+/* ---- modal ---- */
+function openModal(html){
+  closeModal();
+  const ov=document.createElement('div');
+  ov.className='overlay'; ov.id='ov';
+  ov.innerHTML='<div class="modal"><button class="close" onclick="closeModal()">✕ 閉じる</button>'+html+'</div>';
+  ov.addEventListener('click',e=>{if(e.target===ov)closeModal();});
+  document.body.appendChild(ov);
+}
+function closeModal(){const ov=$('ov'); if(ov)ov.remove(); if(charts['modalChart']){charts['modalChart'].destroy(); delete charts['modalChart'];}}
+
+/* ---- 優待の権利達成判定 ---- */
+function parseAcqDate(memo){
+  const m = String(memo||'').match(/(20\d{2})[\/\.年](\d{1,2})/);
+  return m ? {y:+m[1], m:+m[2]} : null;
+}
+function eligibility(h, now){
+  const text = (h.yutaiFull||'') + ' ' + (h.memo||'');
+  if(/達成中/.test(text)) return {s:'ok', label:'条件達成'};
+  const cond = text.match(/(\d+)年(以上|で|保有)/);
+  if(!cond) return {s:'ok', label:'条件なし'};
+  const needY = +cond[1];
+  const acq = parseAcqDate(h.memo);
+  if(!acq) return {s:'unk', label:needY+'年条件・取得日不明'};
+  const heldM = (now.getFullYear()-acq.y)*12 + (now.getMonth()+1-acq.m);
+  if(heldM >= needY*12) return {s:'ok', label:needY+'年条件クリア'};
+  return {s:'wait', label:'あと'+(needY*12-heldM)+'ヶ月で'+needY+'年'};
+}
+function badge(e){
+  const cls = e.s==='ok'?'ok':(e.s==='wait'?'wait':'unk');
+  const ico = e.s==='ok'?'✅':(e.s==='wait'?'⏳':'❓');
+  return '<span class="badge '+cls+'">'+ico+' '+e.label+'</span>';
+}
 
 async function boot(){
   $('errbox').innerHTML='';
   const errs=[];
   const get=async(u,l)=>{ if(!u)return null; try{return await fetchCSV(u);}catch(e){errs.push(l+': '+e.message);return null;} };
-  const [snap,cf,port,loan,meisai]=await Promise.all([
-    get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細')
+  const [snap,cf,port,loan,meisai,report]=await Promise.all([
+    get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート')
   ]);
   if(errs.length) $('errbox').innerHTML='<div class="err">読み込みエラー: '+errs.join(' / ')+'<br>URLが「ウェブに公開」のCSV形式か確認してください。</div>';
   if(!snap||!cf||!port){$('app').classList.remove('hidden');return;}
-  render({snap,cf,port,loan,meisai});
+  render({snap,cf,port,loan,meisai,report});
   $('stamp').textContent='更新: '+new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   $('app').classList.remove('hidden');
 }
@@ -555,6 +656,18 @@ function render(d){
     x:{ticks:{color:'#8A93A6',font:{size:11}},grid:{display:false}},
     y:{ticks:{color:'#8A93A6',font:{size:11},callback:v=>man(v)},grid:{color:'#EDF0F7'}}}}});
 
+  /* stacked area: 資産内訳推移 */
+  const stackDefs = [
+    ['現金・預金', s=>s.cash, '#5AB6F2'], ['電子マネー', s=>s.em, '#4DD0E1'],
+    ['楽天証券', s=>s.rk, '#F06E9C'], ['SMBC日興', s=>s.nikko, '#8E7CE0'], ['SBI証券', s=>s.sbi, '#43C59E']
+  ];
+  mkChart('stackChart',{type:'line',data:{
+    labels:snaps.map(s=>s.dt.y+'/'+s.dt.m),
+    datasets:stackDefs.map(([lb,fn,col])=>({label:lb,data:snaps.map(fn),borderColor:col,backgroundColor:col+'55',fill:true,tension:0.25,pointRadius:3,borderWidth:1.5}))
+  },options:{plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:10.5},boxWidth:12,padding:10}}},
+    scales:{x:{stacked:false,ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
+      y:{stacked:true,ticks:{color:'#8A93A6',font:{size:10},callback:v=>man(v)},grid:{color:'#EDF0F7'}}}}});
+
   /* pie */
   if(latest){
     mkChart('pieChart',{type:'doughnut',data:{
@@ -569,7 +682,7 @@ function render(d){
   for(let i=1;i<d.port.length;i++){
     const r=d.port[i];const name=(r[1]||'').trim();const value=num(r[6]);
     if(!name||name==='合計'||value===null)continue;
-    holdings.push({name,value,divTotal:num(r[8])||0,rights:String(r[10]||''),ytype:(r[11]||''),yutai:(r[12]||'').split('/')[0].trim(),yval:num(r[13])||0});
+    holdings.push({name,value,divTotal:num(r[8])||0,rights:String(r[10]||''),ytype:(r[11]||''),yutai:(r[12]||'').split('/')[0].trim(),yutaiFull:String(r[12]||''),yval:num(r[13])||0,memo:String(r[14]||'')});
   }
   const totalVal=holdings.reduce((s,h)=>s+h.value,0);
   const totalDiv=holdings.reduce((s,h)=>s+h.divTotal,0);
@@ -632,19 +745,48 @@ function render(d){
       <td><div class="bar-wrap"><span class="num" style="min-width:70px;font-size:11.5px;">${man(v.exp)}円</span><div class="bar exp" style="width:${Math.round(v.exp/maxAmt*100)}%"></div></div></td></tr>`;
   }).join('');
 
-  /* ===== category stacked ===== */
-  const catYears=Object.keys(catByYear).sort();
-  const catTotals={};
-  catYears.forEach(y=>Object.entries(catByYear[y]).forEach(([c,v])=>catTotals[c]=(catTotals[c]||0)+v));
-  const topCats=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,14).map(e=>e[0]);
-  const dsets=topCats.map((c,i)=>({label:c,data:catYears.map(y=>{
-      const total=Object.values(catByYear[y]).reduce((s,v)=>s+v,0);
-      return total?Math.round((catByYear[y][c]||0)/total*1000)/10:0;
+  /* ===== category stacked (大分類ベース) ===== */
+  window.__cfRows = [];  // 項目詳細モーダル用に保持
+  for(let i=1;i<d.cf.length;i++){
+    const r=d.cf[i];const dt=ym(r[0]);const amt=num(r[3]);
+    if(!dt||amt===null||r[1]==='収入')continue;
+    window.__cfRows.push({y:dt.y,m:dt.m,item:r[2]||'',amt,pay:r[4]||''});
+  }
+  const bigByYear={}, itemTotals={}, itemBig={};
+  window.__cfRows.forEach(r=>{
+    const bc=bigCat(r.item);
+    if(!bigByYear[r.y])bigByYear[r.y]={};
+    bigByYear[r.y][bc]=(bigByYear[r.y][bc]||0)+r.amt;
+    itemTotals[r.item]=(itemTotals[r.item]||0)+r.amt;
+    itemBig[r.item]=bc;
+  });
+  const catYears=Object.keys(bigByYear).sort();
+  const bigOrder=['住まい','食費・日用','貯蓄・投資','ローン返済','健康・美容','通信','サブスク','交通','その他'];
+  const dsets=bigOrder.map((c,i)=>({label:c,data:catYears.map(y=>{
+      const total=Object.values(bigByYear[y]).reduce((s,v)=>s+v,0);
+      return total?Math.round((bigByYear[y][c]||0)/total*1000)/10:0;
     }),backgroundColor:CAT_COLORS[i%CAT_COLORS.length]}));
   mkChart('catChart',{type:'bar',data:{labels:catYears.map(y=>y+'年'),datasets:dsets},
-    options:{indexAxis:'y',plugins:{legend:{position:'right',labels:{color:'#2E3440',font:{size:10},boxWidth:12,padding:8}}},
+    options:{indexAxis:'y',plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:11},boxWidth:12,padding:10}},
+      tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.x+'%'}}},
     scales:{x:{stacked:true,max:100,ticks:{color:'#8A93A6',font:{size:10},callback:v=>v+'%'},grid:{color:'#EDF0F7'}},
       y:{stacked:true,ticks:{color:'#2E3440',font:{size:12,weight:'bold'}},grid:{display:false}}}}});
+
+  /* 項目リスト（大分類ごと・クリックで推移モーダル） */
+  const grouped={};
+  Object.entries(itemTotals).forEach(([item,total])=>{
+    const bc=itemBig[item];
+    if(!grouped[bc])grouped[bc]=[];
+    grouped[bc].push({item,total});
+  });
+  $('itemList').innerHTML = bigOrder.filter(bc=>grouped[bc]).map(bc=>
+    '<div style="margin-bottom:14px;"><div style="font-weight:900;font-size:13px;color:var(--header);margin-bottom:6px;">'+bc+'</div>'+
+    grouped[bc].sort((a,b)=>b.total-a.total).map(g=>
+      `<div class="mrow clickable" onclick="showItemChart('${g.item.replace(/'/g,"\\'")}')">
+        <div><span class="nm">${g.item}</span><div class="dt">累計 ${yen(g.total)}</div></div>
+        <div style="color:var(--dim);font-size:18px;">›</div>
+      </div>`).join('')+'</div>'
+  ).join('');
 
   /* detail table: latest 100 expense rows */
   const detRows=[];
@@ -669,31 +811,43 @@ function render(d){
       <tbody>${rows.slice(-60).reverse().join('')}</tbody></table>`;
   }
 
-  /* ===== yutai/dividend calendar ===== */
-  const cal=Array.from({length:12},()=>({yutai:[],div:0}));
-  holdings.forEach(h=>{
-    const months=(h.rights.match(/(\d+)月/g)||[]).map(m=>parseInt(m)-1).filter(m=>m>=0&&m<12);
-    months.forEach(m=>{
-      cal[m].yutai.push(h.name);
-      // 配当: 権利月+3ヶ月に、年間配当を権利月数で按分して支払われると仮定
-      if(h.divTotal>0&&months.length>0){
-        const payM=(m+3)%12;
-        cal[payM].div+=h.divTotal/months.length;
-      }
+  /* ===== yutai/dividend calendar (v4: クリック・権利判定・トグル) ===== */
+  window.__holdings = holdings;
+  window.__now = now;
+  function buildCal(eligOnlyFlag){
+    const cal=Array.from({length:12},()=>({yutai:[],div:[]}));
+    holdings.forEach(h=>{
+      const e = eligibility(h, now);
+      const months=(h.rights.match(/(\d+)月/g)||[]).map(m=>parseInt(m)-1).filter(m=>m>=0&&m<12);
+      months.forEach(m=>{
+        if(h.yutai && (!eligOnlyFlag || e.s==='ok')) cal[m].yutai.push({h, e});
+        if(h.divTotal>0&&months.length>0){
+          cal[(m+3)%12].div.push({name:h.name, amt:h.divTotal/months.length});
+        }
+      });
     });
-  });
-  const nowM=now.getMonth();
-  $('y-now').textContent=cal[nowM].yutai.length;
-  $('y-div-now').textContent=yen(cal[nowM].div);
+    return cal;
+  }
+  window.__buildCal = buildCal;
+  function renderCal(){
+    const eligOnly = $('eligOnly').checked;
+    const cal = buildCal(eligOnly);
+    const nowM = now.getMonth();
+    $('y-now').textContent=cal[nowM].yutai.length;
+    $('y-div-now').textContent=yen(cal[nowM].div.reduce((s,x)=>s+x.amt,0));
+    $('ycal').innerHTML=cal.map((c,i)=>{
+      const divSum=c.div.reduce((s,x)=>s+x.amt,0);
+      return `<div class="ymonth clickable ${i===nowM?'now':''}" onclick="showMonth(${i})">
+        <div class="mh"><span class="mn">${i+1}月</span><span class="cnt">🎁${c.yutai.length}銘柄</span></div>
+        ${c.yutai.length?`<div class="sec">権利確定</div><div class="names">${c.yutai.slice(0,4).map(x=>x.h.name).join('、')}${c.yutai.length>4?' 他'+(c.yutai.length-4)+'件':''}</div>`:''}
+        ${divSum>0?`<div class="sec">配当支払(目安)</div><div class="div">💰 ${yen(divSum)}</div>`:''}
+      </div>`;
+    }).join('');
+  }
+  $('eligOnly').onchange = renderCal;
+  renderCal();
   $('y-value').textContent=totalYval?yen(totalYval):'—';
   $('y-value-sub').textContent='優待内容の推定価値の合計';
-
-  $('ycal').innerHTML=cal.map((c,i)=>`
-    <div class="ymonth ${i===nowM?'now':''}">
-      <div class="mh"><span class="mn">${i+1}月</span><span class="cnt">🎁${c.yutai.length}銘柄</span></div>
-      ${c.yutai.length?`<div class="sec">権利確定</div><div class="names">${c.yutai.slice(0,4).join('、')}${c.yutai.length>4?' 他'+(c.yutai.length-4)+'件':''}</div>`:''}
-      ${c.div>0?`<div class="sec">配当支払(目安)</div><div class="div">💰 ${yen(c.div)}</div>`:''}
-    </div>`).join('');
 
   /* holdings table */
   const sorted=[...holdings].sort((a,b)=>b.value-a.value);
@@ -711,7 +865,70 @@ function render(d){
   }else{$('k-loan').textContent='—';$('k-loan-sub').textContent='負債シート未接続';}
 
   /* alerts */
+  renderReports(d.report);
   $('alertbox').innerHTML=alerts.length?'<div class="alert">📋 '+alerts.join('<br>')+'</div>':'';
+}
+
+/* ===== v4 グローバル関数 ===== */
+function showMonth(mIdx){
+  const now = window.__now, eligOnly = $('eligOnly').checked;
+  const cal = window.__buildCal(eligOnly);
+  const c = cal[mIdx];
+  const divSum = c.div.reduce((s,x)=>s+x.amt,0);
+  let html = '<h3>'+(mIdx+1)+'月の優待・配当</h3><div class="sub">配当支払は「権利確定月＋3ヶ月」の概算。実際の支払月・金額は銘柄により前後します。</div>';
+  html += '<h4 style="font-size:13px;font-weight:900;margin:10px 0 4px;">🎁 権利確定する優待（'+c.yutai.length+'銘柄）</h4>';
+  if(c.yutai.length){
+    html += c.yutai.map(x=>`<div class="mrow"><div><span class="nm">${x.h.name}</span>${badge(x.e)}<div class="dt">${x.h.yutaiFull||x.h.yutai||''}</div></div><div class="amt">${x.h.yval?yen(x.h.yval):''}</div></div>`).join('');
+  } else html += '<div class="sub">なし</div>';
+  html += '<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">💰 支払われる配当（目安 合計 '+yen(divSum)+'）</h4>';
+  if(c.div.length){
+    html += [...c.div].sort((a,b)=>b.amt-a.amt).map(x=>`<div class="mrow"><div class="nm">${x.name}</div><div class="amt">${yen(x.amt)}</div></div>`).join('');
+  } else html += '<div class="sub">なし</div>';
+  openModal(html);
+}
+
+function showItemChart(item){
+  const rows = (window.__cfRows||[]).filter(r=>r.item===item).sort((a,b)=>(a.y*12+a.m)-(b.y*12+b.m));
+  if(!rows.length) return;
+  const labels = rows.map(r=>r.y+'/'+r.m);
+  const vals = rows.map(r=>r.amt);
+  const byY = {};
+  rows.forEach(r=>byY[r.y]=(byY[r.y]||0)+r.amt);
+  const yearRows = Object.keys(byY).sort().reverse().map(y=>`<div class="mrow"><div class="nm">${y}年</div><div class="amt" style="color:var(--net)">${yen(byY[y])}</div></div>`).join('');
+  openModal('<h3>'+item+'</h3><div class="sub">'+bigCat(item)+'｜月ごとの支払い推移と年間合計</div><canvas id="modalCanvas" height="200"></canvas><h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">年間合計</h4>'+yearRows);
+  charts['modalChart'] = new Chart($('modalCanvas'),{type:'bar',data:{labels,datasets:[{label:item,data:vals,backgroundColor:'#5B67CA',borderRadius:4}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8A93A6',font:{size:9},maxTicksLimit:14},grid:{display:false}},y:{ticks:{color:'#8A93A6',font:{size:10},callback:v=>(v/10000)+'万'},grid:{color:'#EDF0F7'}}}}});
+}
+
+function mdLite(s){
+  return String(s||'').split(/\n/).map(line=>{
+    line = line.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+    if(/^#{1,3}\s/.test(line)) return '<h4>'+line.replace(/^#{1,3}\s/,'')+'</h4>';
+    if(/^[-・]\s?/.test(line)) return '<p>• '+line.replace(/^[-・]\s?/,'')+'</p>';
+    if(line.trim()==='') return '';
+    return '<p>'+line+'</p>';
+  }).join('');
+}
+function renderReports(rep){
+  if(!rep || rep.length<2) return;
+  const items=[];
+  for(let i=1;i<rep.length;i++){
+    const r=rep[i];
+    if(!r[0]||!r[1])continue;
+    items.push({ym:String(r[0]), body:String(r[1])});
+  }
+  if(!items.length)return;
+  items.sort((a,b)=>b.ym.localeCompare(a.ym));
+  window.__reports = items;
+  $('replist').innerHTML = items.map((it,i)=>`
+    <div class="repitem" onclick="showReport(${i})">
+      <div class="rt">📝 ${it.ym} のレポート</div>
+      <div class="rp">${it.body.slice(0,90).replace(/[#*\n]/g,' ')}…</div>
+    </div>`).join('');
+}
+function showReport(i){
+  const it = window.__reports[i];
+  openModal('<h3>📝 '+it.ym+' 月次FPレポート</h3><div class="repbody">'+mdLite(it.body)+'</div>');
 }
 </script>
 </body>
