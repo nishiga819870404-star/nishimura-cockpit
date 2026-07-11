@@ -809,7 +809,7 @@ function render(d){
       heatSrc[c].forEach(v=>{
         const a = v>0 ? 0.12+0.75*(v/maxV) : 0;
         const label = v>=10000 ? Math.round(v/1000)+'k' : (v>0?Math.round(v/1000*10)/10+'k':'');
-        html+=`<td style="text-align:center;font-size:10px;background:rgba(91,103,202,${a});color:${a>0.5?'#fff':'#2E3440'};">${label}</td>`;
+        html+=`<td class="${v>0?'clickable':''}" ${v>0?`onclick="showCatMonth('${c.replace(/'/g,"\\'")}',${heatSrc[c].indexOf(v)+1})"`:''} style="text-align:center;font-size:10px;background:rgba(91,103,202,${a});color:${a>0.5?'#fff':'#2E3440'};">${label}</td>`;
       });
       html+=`<td class="num" style="font-weight:800;">${yen(heatSrc[c].reduce((s,v)=>s+v,0))}</td></tr>`;
     });
@@ -955,6 +955,19 @@ function render(d){
   $('alertbox').innerHTML=alerts.length?'<div class="alert">📋 '+alerts.join('<br>')+'</div>':'';
 }
 
+/* ===== v8 カテゴリ内訳 ===== */
+function showCatMonth(cat, m){
+  const now = window.__now || new Date();
+  const y = now.getFullYear();
+  const rows = (window.__meisai||[]).filter(r=>r.y===y && r.m===m && r.cat===cat).sort((a,b)=>b.amt-a.amt);
+  let html = `<h3>${cat} — ${y}年${m}月</h3><div class="sub">この費目・この月の内訳（購入明細より）</div>`;
+  if(rows.length){
+    html += rows.map(r=>`<div class="mrow"><div><span class="nm">${r.item}</span><div class="dt">${r.store}・${r.pay}</div></div><div class="amt" style="color:var(--net)">${yen(r.amt)}</div></div>`).join('');
+    html += `<div class="mrow" style="border-top:2px solid var(--line);"><div class="nm">合計（${rows.length}件）</div><div class="amt">${yen(rows.reduce((s,r)=>s+r.amt,0))}</div></div>`;
+  } else html += '<div class="sub">明細なし</div>';
+  openModal(html);
+}
+
 /* ===== v7 収支カレンダー用 ===== */
 function showCfMonth(mIdx){
   const now = window.__now || new Date();
@@ -968,8 +981,8 @@ function showCfMonth(mIdx){
   html += inc.length ? inc.map(r=>`<div class="mrow"><div class="nm">${r.item}</div><div class="amt" style="color:var(--income)">${yen(r.amt)}</div></div>`).join('') : '<div class="sub">なし</div>';
   html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;color:var(--expense);">🔴 支出 合計 ${yen(exp.reduce((s,r)=>s+r.amt,0))}</h4>`;
   html += exp.sort((a,b)=>b.amt-a.amt).map(r=>{
-    const isCard = /カード|メルペイ|ジャックス|ビュー/.test(r.item);
-    const hasDetail = meisai.some(x=>x.pay && r.item.includes(x.pay.slice(0,3)));
+    const isCard = /カード|メルペイ|ジャックス|ビュー|三井住友|楽天|Amazon|ミツイスミトモ/.test(r.item);
+    const hasDetail = meisai.some(x=>x.pay && cardKey(x.pay)===cardKey(r.item));
     if(isCard){
       return `<div class="mrow clickable" onclick="showCardDetail(${y},${m},'${r.item.replace(/'/g,"\\'")}')"><div><span class="nm">${r.item}</span><div class="dt">クリックで内訳${hasDetail?'':'（明細未取込）'}</div></div><div class="amt" style="color:var(--expense)">${yen(r.amt)} ›</div></div>`;
     }
@@ -977,8 +990,19 @@ function showCfMonth(mIdx){
   }).join('');
   openModal(html);
 }
+function cardKey(name){
+  const s = String(name||'');
+  if(/三井住友|ミツイスミトモ|ﾐﾂｲｽﾐﾄﾓ/.test(s)) return 'smbc';
+  if(/楽天|ラクテン|ﾗｸﾃﾝ/.test(s)) return 'rakuten';
+  if(/メルカード|メルペイ|ﾒﾙﾍﾟｲ/.test(s)) return 'mercari';
+  if(/Amazon|ｱﾏｿﾞﾝ|アマゾン/.test(s)) return 'amazon';
+  if(/ビューカード|ﾋﾞｭ-|ビュー/.test(s)) return 'view';
+  if(/ジャックス|ｼﾞｬｯｸｽ/.test(s)) return 'jaccs';
+  return s.slice(0,4);
+}
 function showCardDetail(y,m,cardItem){
-  const rows = (window.__meisai||[]).filter(r=>r.y===y&&r.m===m&&r.pay&&cardItem.includes(r.pay.slice(0,3)));
+  const key = cardKey(cardItem);
+  const rows = (window.__meisai||[]).filter(r=>r.y===y&&r.m===m&&r.pay&&cardKey(r.pay)===key);
   let html = `<h3>${cardItem}</h3><div class="sub">${y}年${m}月分の内訳（購入明細より）</div>`;
   if(rows.length){
     html += rows.sort((a,b)=>b.amt-a.amt).map(r=>`<div class="mrow"><div><span class="nm">${r.item}</span><div class="dt">${r.store}・${r.cat}</div></div><div class="amt" style="color:var(--net)">${yen(r.amt)}</div></div>`).join('');
@@ -1061,6 +1085,16 @@ function showStock(key){
     <div class="mrow"><div class="nm">評価額</div><div class="amt" style="color:var(--net)">${yen(h.value)}</div></div>
     ${pl}
     <div class="mrow"><div class="nm">年間配当（額面 → 手取り目安）</div><div class="amt">${yen(h.divTotal)} → ${yen(h.divNet)}</div></div>`;
+  // 配当の基本情報（年間配当・回数・権利月）
+  const rightsMonths = (h.rights.match(/(\d+)月/g)||[]);
+  const divCount = rightsMonths.length;
+  const divPerTime = divCount>0 ? Math.round(h.divTotal/divCount) : 0;
+  let divFreq = divCount===0 ? '配当なし/不明' : (divCount===1?'年1回':(divCount===2?'年2回':'年'+divCount+'回'));
+  html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">💴 配当の基本情報</h4>
+    <div class="mrow"><div class="nm">年間配当（額面）</div><div class="amt">${h.divTotal?yen(h.divTotal):'−'}</div></div>
+    <div class="mrow"><div class="nm">手取り目安</div><div class="amt">${h.divNet?yen(h.divNet):'−'}<span style="font-size:10px;color:var(--dim)"> (${h.acct.includes('NISA')?'非課税':'20.315%控除'})</span></div></div>
+    <div class="mrow"><div><span class="nm">支払回数</span><div class="dt">${divFreq}${divCount>0?' ／ 1回あたり約'+yen(divPerTime):''}</div></div><div style="font-size:12px;color:var(--dim);">${h.rights||'権利月不明'}</div></div>
+    <div class="mrow"><div class="nm">配当利回り</div><div class="amt">${h.value&&h.divTotal?(h.divTotal/h.value*100).toFixed(2)+'%':'−'}</div></div>`;
   html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">💰 配当の受取実績</h4>`;
   if(dh){
     const years = Object.keys(dh.byYear).sort().reverse();
