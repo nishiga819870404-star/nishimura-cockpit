@@ -262,6 +262,8 @@ canvas{max-width:100%;}
     <input id="u-meisai">
     <label>レポート CSV URL（任意・月次FPレポートのストック）</label>
     <input id="u-report">
+    <label>配当履歴 CSV URL（任意・配当受取実績の表示用）</label>
+    <input id="u-hist">
     <button class="go" id="go">ダッシュボード起動 →</button>
     <p class="note" style="margin-top:14px;">設定はURLの#以降に保存されます。起動後のURLをブックマーク／ホーム画面に追加してください。<br>※公開CSVのURLは第三者に渡さないこと。</p>
   </div>
@@ -328,6 +330,11 @@ canvas{max-width:100%;}
           <div class="val" id="k-loan">—</div>
           <div class="sub" id="k-loan-sub">—</div>
         </div>
+        <div class="kpi" style="--accent:#90A4AE">
+          <div class="lb">🏠 住宅ローン（別枠）</div>
+          <div class="val" id="k-house">—</div>
+          <div class="sub" id="k-house-sub">純資産の計算には含めない管理枠</div>
+        </div>
       </div>
 
       <div class="grid2">
@@ -388,9 +395,9 @@ canvas{max-width:100%;}
     <!-- ===== page: detail ===== -->
     <section id="p-detail" class="hidden">
       <div class="card">
-        <h2>費目別支出比率の推移</h2>
-        <canvas id="catChart" height="260"></canvas>
-        <div class="note">各年の支出を費目別に100%積み上げで表示。色の割合の変化＝生活の変化。</div>
+        <h2>今年の支出内訳 <span class="tag" id="catYearTag"></span></h2>
+        <canvas id="catChart" height="240"></canvas>
+        <div class="note">2026年のここまでの実績を大分類で表示。カード明細・レシートの取込が進むほど内訳が精密になっていきます。</div>
       </div>
       <div class="card">
         <h2>費目一覧 <span class="tag">クリックで推移グラフ</span></h2>
@@ -439,9 +446,10 @@ canvas{max-width:100%;}
       <div class="card">
         <h2>保有銘柄一覧（評価額順）</h2>
         <table class="t" id="holdTable">
-          <thead><tr><th>銘柄</th><th style="text-align:right">評価額</th><th style="text-align:right">年間配当</th><th>権利月</th><th>優待内容</th></tr></thead>
+          <thead><tr><th>銘柄</th><th>口座</th><th style="text-align:right">評価額</th><th style="text-align:right">年配当(額面/手取)</th><th>権利月</th><th>優待</th></tr></thead>
           <tbody></tbody>
         </table>
+        <div class="note">銘柄をクリックすると、取得単価・含み損益・これまでの配当受取履歴が見られます。</div>
       </div>
     </section>
 
@@ -535,7 +543,7 @@ document.querySelectorAll('.navitem').forEach(el=>{
 let CFG = readCfg();
 if(CFG){ $('setup').classList.add('hidden'); boot(); }
 $('go').addEventListener('click',()=>{
-  const c={snap:$('u-snap').value.trim(),cf:$('u-cf').value.trim(),port:$('u-port').value.trim(),loan:$('u-loan').value.trim(),meisai:$('u-meisai').value.trim(),report:$('u-report').value.trim()};
+  const c={snap:$('u-snap').value.trim(),cf:$('u-cf').value.trim(),port:$('u-port').value.trim(),loan:$('u-loan').value.trim(),meisai:$('u-meisai').value.trim(),report:$('u-report').value.trim(),hist:$('u-hist').value.trim()};
   // v2互換: med設定は無視
   if(!c.snap||!c.cf||!c.port){alert('必須3つのURLを入れてください');return;}
   CFG=c;writeCfg(c);$('setup').classList.add('hidden');boot();
@@ -543,7 +551,7 @@ $('go').addEventListener('click',()=>{
 $('reload').addEventListener('click',()=>{if(CFG)boot();});
 $('reconfig').addEventListener('click',()=>{
   $('app').classList.add('hidden');$('setup').classList.remove('hidden');
-  if(CFG){$('u-snap').value=CFG.snap||'';$('u-cf').value=CFG.cf||'';$('u-port').value=CFG.port||'';$('u-loan').value=CFG.loan||'';$('u-meisai').value=CFG.meisai||'';$('u-report').value=CFG.report||'';}
+  if(CFG){$('u-snap').value=CFG.snap||'';$('u-cf').value=CFG.cf||'';$('u-port').value=CFG.port||'';$('u-loan').value=CFG.loan||'';$('u-meisai').value=CFG.meisai||'';$('u-report').value=CFG.report||'';$('u-hist').value=CFG.hist||'';}
 });
 
 /* ---- charts registry ---- */
@@ -608,12 +616,12 @@ async function boot(){
   $('errbox').innerHTML='';
   const errs=[];
   const get=async(u,l)=>{ if(!u)return null; try{return await fetchCSV(u);}catch(e){errs.push(l+': '+e.message);return null;} };
-  const [snap,cf,port,loan,meisai,report]=await Promise.all([
-    get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート')
+  const [snap,cf,port,loan,meisai,report,hist]=await Promise.all([
+    get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート'),get(CFG.hist,'配当履歴')
   ]);
   if(errs.length) $('errbox').innerHTML='<div class="err">読み込みエラー: '+errs.join(' / ')+'<br>URLが「ウェブに公開」のCSV形式か確認してください。</div>';
   if(!snap||!cf||!port){$('app').classList.remove('hidden');return;}
-  render({snap,cf,port,loan,meisai,report});
+  render({snap,cf,port,loan,meisai,report,hist});
   $('stamp').textContent='更新: '+new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   $('app').classList.remove('hidden');
 }
@@ -643,7 +651,7 @@ function render(d){
     $('f-asset').textContent=yen(latest.asset);
     $('f-debt').textContent=yen(latest.debt);
     $('f-net-sub').innerHTML = prev? '前月比 '+signed(latest.net-prev.net) : '初回記録';
-    $('f-debt-sub').textContent='レイク＋その他';
+    $('f-debt-sub').textContent='レイク等（住宅ローンは別枠）';
     if(latest.dt.y!==now.getFullYear()||latest.dt.m!==now.getMonth()+1)
       alerts.push('<b>今月の棚卸しがまだです</b>：スクショを撮ってClaudeに「取り込んで」');
   }else alerts.push('<b>資産スナップショットにデータがありません</b>');
@@ -658,7 +666,7 @@ function render(d){
 
   /* stacked area: 資産内訳推移 */
   const stackDefs = [
-    ['現金・預金', s=>s.cash, '#5AB6F2'], ['電子マネー', s=>s.em, '#4DD0E1'],
+    ['現金・預金', s=>s.cash + s.em, '#5AB6F2'],
     ['楽天証券', s=>s.rk, '#F06E9C'], ['SMBC日興', s=>s.nikko, '#8E7CE0'], ['SBI証券', s=>s.sbi, '#43C59E']
   ];
   mkChart('stackChart',{type:'line',data:{
@@ -668,12 +676,15 @@ function render(d){
     scales:{x:{stacked:false,ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
       y:{stacked:true,ticks:{color:'#8A93A6',font:{size:10},callback:v=>man(v)},grid:{color:'#EDF0F7'}}}}});
 
-  /* pie */
+  /* pie: 日本株/投信の区分（投信≒証券合計−優待株評価額の概算） */
   if(latest){
+    const secTotal = latest.rk + latest.nikko + latest.sbi;
+    const nihonKabu = Math.min(totalVal, secTotal);
+    const toushin = Math.max(0, secTotal - nihonKabu);
     mkChart('pieChart',{type:'doughnut',data:{
-      labels:['現金・預金','電子マネー','楽天証券','SMBC日興','SBI証券'],
-      datasets:[{data:[latest.cash,latest.em,latest.rk,latest.nikko,latest.sbi],
-        backgroundColor:['#5AB6F2','#4DD0E1','#F06E9C','#8E7CE0','#43C59E'],borderWidth:2,borderColor:'#fff'}]
+      labels:['現金・預金','日本株（優待株）','投信・その他証券'],
+      datasets:[{data:[latest.cash+latest.em,nihonKabu,toushin],
+        backgroundColor:['#5AB6F2','#F06E9C','#43C59E'],borderWidth:2,borderColor:'#fff'}]
     },options:{plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:11},padding:14}}},cutout:'58%'}});
   }
 
@@ -682,7 +693,11 @@ function render(d){
   for(let i=1;i<d.port.length;i++){
     const r=d.port[i];const name=(r[1]||'').trim();const value=num(r[6]);
     if(!name||name==='合計'||value===null)continue;
-    holdings.push({name,value,divTotal:num(r[8])||0,rights:String(r[10]||''),ytype:(r[11]||''),yutai:(r[12]||'').split('/')[0].trim(),yutaiFull:String(r[12]||''),yval:num(r[13])||0,memo:String(r[14]||'')});
+    const acct=(r[2]||'').trim();
+    const gross=num(r[8])||0;
+    holdings.push({name,code:String(r[0]||'').trim(),acct,shares:num(r[3])||0,acqPrice:num(r[4]),curPrice:num(r[5]),
+      value,divTotal:gross,divNet:acct.includes('NISA')?gross:Math.round(gross*0.79685),
+      rights:String(r[10]||''),ytype:(r[11]||''),yutai:(r[12]||'').split('/')[0].trim(),yutaiFull:String(r[12]||''),yval:num(r[13])||0,memo:String(r[14]||''),detail:String(r[15]||'')});
   }
   const totalVal=holdings.reduce((s,h)=>s+h.value,0);
   const totalDiv=holdings.reduce((s,h)=>s+h.divTotal,0);
@@ -694,9 +709,11 @@ function render(d){
 
   /* ===== cashflow ===== */
   const byMonth={},byYear={},catByYear={};
+  const nowKey = now.getFullYear()*12 + now.getMonth()+1;
   for(let i=1;i<d.cf.length;i++){
     const r=d.cf[i];const dt=ym(r[0]);const kubun=r[1];const item=r[2]||'';const amt=num(r[3]);
     if(!dt||amt===null)continue;
+    if(dt.y*12+dt.m > nowKey) continue; // 未来の予定行は集計しない
     const mk=dt.y+'-'+String(dt.m).padStart(2,'0');
     if(!byMonth[mk])byMonth[mk]={inc:0,exp:0};
     if(!byYear[dt.y])byYear[dt.y]={inc:0,exp:0};
@@ -750,6 +767,7 @@ function render(d){
   for(let i=1;i<d.cf.length;i++){
     const r=d.cf[i];const dt=ym(r[0]);const amt=num(r[3]);
     if(!dt||amt===null||r[1]==='収入')continue;
+    if(dt.y*12+dt.m > nowKey) continue; // 未来の予定行は除外
     window.__cfRows.push({y:dt.y,m:dt.m,item:r[2]||'',amt,pay:r[4]||''});
   }
   const bigByYear={}, itemTotals={}, itemBig={};
@@ -760,17 +778,20 @@ function render(d){
     itemTotals[r.item]=(itemTotals[r.item]||0)+r.amt;
     itemBig[r.item]=bc;
   });
-  const catYears=Object.keys(bigByYear).sort();
   const bigOrder=['住まい','食費・日用','貯蓄・投資','ローン返済','健康・美容','通信','サブスク','交通','その他'];
-  const dsets=bigOrder.map((c,i)=>({label:c,data:catYears.map(y=>{
-      const total=Object.values(bigByYear[y]).reduce((s,v)=>s+v,0);
-      return total?Math.round((bigByYear[y][c]||0)/total*1000)/10:0;
-    }),backgroundColor:CAT_COLORS[i%CAT_COLORS.length]}));
-  mkChart('catChart',{type:'bar',data:{labels:catYears.map(y=>y+'年'),datasets:dsets},
-    options:{indexAxis:'y',plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:11},boxWidth:12,padding:10}},
-      tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.x+'%'}}},
-    scales:{x:{stacked:true,max:100,ticks:{color:'#8A93A6',font:{size:10},callback:v=>v+'%'},grid:{color:'#EDF0F7'}},
-      y:{stacked:true,ticks:{color:'#2E3440',font:{size:12,weight:'bold'}},grid:{display:false}}}}});
+  const thisY = now.getFullYear();
+  $('catYearTag').textContent = thisY + '年 実績';
+  const yearCats = bigByYear[thisY] || {};
+  const catLabels = bigOrder.filter(c=>yearCats[c]);
+  mkChart('catChart',{type:'doughnut',data:{
+    labels:catLabels,
+    datasets:[{data:catLabels.map(c=>yearCats[c]),backgroundColor:catLabels.map((c,i)=>CAT_COLORS[bigOrder.indexOf(c)%CAT_COLORS.length]),borderWidth:2,borderColor:'#fff'}]
+  },options:{plugins:{legend:{position:'right',labels:{color:'#2E3440',font:{size:11},padding:10,
+    generateLabels:(chart)=>{
+      const total=chart.data.datasets[0].data.reduce((s,v)=>s+v,0);
+      return chart.data.labels.map((l,i)=>({text:`${l}  ${yen(chart.data.datasets[0].data[i])} (${Math.round(chart.data.datasets[0].data[i]/total*100)}%)`,fillStyle:chart.data.datasets[0].backgroundColor[i],fontColor:'#2E3440'}));
+    }}},
+    tooltip:{callbacks:{label:c=>c.label+': '+yen(c.parsed)}}},cutout:'55%'}});
 
   /* 項目リスト（大分類ごと・クリックで推移モーダル） */
   const grouped={};
@@ -822,7 +843,7 @@ function render(d){
       months.forEach(m=>{
         if(h.yutai && (!eligOnlyFlag || e.s==='ok')) cal[m].yutai.push({h, e});
         if(h.divTotal>0&&months.length>0){
-          cal[(m+3)%12].div.push({name:h.name, amt:h.divTotal/months.length});
+          cal[(m+3)%12].div.push({name:h.name, amt:h.divTotal/months.length, net:h.divNet/months.length, acct:h.acct});
         }
       });
     });
@@ -849,11 +870,17 @@ function render(d){
   $('y-value').textContent=totalYval?yen(totalYval):'—';
   $('y-value-sub').textContent='優待内容の推定価値の合計';
 
-  /* holdings table */
+  /* holdings table (クリックで個別モーダル) */
+  window.__divHist = parseDivHist(d.hist);
   const sorted=[...holdings].sort((a,b)=>b.value-a.value);
+  window.__holdIdx = {};
+  sorted.forEach((h,i)=>window.__holdIdx[h.name+'|'+h.acct]=h);
   $('holdTable').querySelector('tbody').innerHTML=sorted.map(h=>`
-    <tr><td><b>${h.name}</b></td><td class="num">${yen(h.value)}</td>
-    <td class="num" style="color:var(--green)">${h.divTotal?yen(h.divTotal):'−'}</td>
+    <tr class="clickable" onclick="showStock('${(h.name+'|'+h.acct).replace(/'/g,"\\'")}')">
+    <td><b>${h.name}</b></td>
+    <td><span class="catchip" style="${h.acct.includes('NISA')?'background:#E3F7EF;color:#1B9E77;':''}">${h.acct||'−'}</span></td>
+    <td class="num">${yen(h.value)}</td>
+    <td class="num" style="color:var(--green)">${h.divTotal?yen(h.divTotal)+' / '+yen(h.divNet):'−'}</td>
     <td>${h.rights||'−'}</td><td style="font-size:11.5px;color:var(--dim)">${h.yutai||'−'}</td></tr>`).join('');
 
   /* ===== loan ===== */
@@ -863,13 +890,106 @@ function render(d){
     $('k-loan').textContent=yen(lake.current);
     $('k-loan-sub').textContent='完済予定 '+lake.end+'（'+Math.round((lake.initial-lake.current)/lake.initial*100)+'%返済済）';
   }else{$('k-loan').textContent='—';$('k-loan-sub').textContent='負債シート未接続';}
+  let house=null;
+  if(d.loan){for(const r of d.loan){if((r[0]||'').includes('住宅')){house=num(r[2]);break;}}}
+  if(house){$('k-house').textContent=yen(house);$('k-house-sub').textContent='月次返済 ¥64,503（購入61,391＋リフォーム3,112）';}
 
   /* alerts */
   renderReports(d.report);
   $('alertbox').innerHTML=alerts.length?'<div class="alert">📋 '+alerts.join('<br>')+'</div>':'';
 }
 
-/* ===== v4 グローバル関数 ===== */
+/* ===== v4/v5 グローバル関数 ===== */
+function parseDivHist(hist){
+  // 取引履歴_日興 CSV: 受渡日,約定日,商品等,取引種類,銘柄名,銘柄コード,口座,数量,単価,支払,預り
+  const map = {};
+  if(!hist || hist.length < 2) return map;
+  for(let i=1;i<hist.length;i++){
+    const r = hist[i];
+    if(!r || !String(r[3]||'').includes('配当金')) continue;
+    const code = String(r[5]||'').trim();
+    const name = String(r[4]||'').trim();
+    const amt = num(r[10]);
+    const ym2 = String(r[0]||'').match(/(\d{4})-(\d{2})/);
+    if(amt===null) continue;
+    const key = code || name;
+    if(!map[key]) map[key] = {name, byYear:{}, total:0, count:0};
+    const y = ym2 ? ym2[1] : '不明';
+    map[key].byYear[y] = (map[key].byYear[y]||0) + amt;
+    map[key].total += amt; map[key].count++;
+  }
+  return map;
+}
+
+function estimateYutaiHistory(h, now){
+  // 取得日×権利月×ティアから「貰ってきたはず」の履歴を逆算
+  const acqM = parseAcqDate(h.memo);
+  if(!acqM) return null;
+  const rightsMonths = (h.rights.match(/(\d+)月/g)||[]).map(m=>parseInt(m));
+  if(!rightsMonths.length) return null;
+  const text = (h.detail||h.yutaiFull||'');
+  // ティア: [必要年数, 説明] を抽出（金額 or 内容フレーズ）
+  const tiers = [];
+  let m2;
+  const re = /(\d+)年(?:以上|で|継続|保有)[^\d円]{0,10}([\d,]+)\s*円/g;
+  while((m2 = re.exec(text)) !== null) tiers.push([+m2[1], m2[2].replace(/,/g,'')+'円']);
+  const base = text.match(/(?<!年)([\d,]{3,7})\s*円/);
+  if(base && !tiers.some(x=>x[0]===0)) tiers.unshift([0, base[1].replace(/,/g,'')+'円']);
+  const events = [];
+  for(let y = acqM.y; y <= now.getFullYear(); y++){
+    for(const rm of rightsMonths){
+      const heldM = (y - acqM.y)*12 + (rm - acqM.m);
+      if(heldM < 0) continue;
+      if(y === now.getFullYear() && rm > now.getMonth()+1) continue;
+      const heldY = heldM/12;
+      const elig = tiers.filter(x=>heldY >= x[0]);
+      const stage = elig.length ? elig[elig.length-1] : null;
+      const what = stage ? stage[1]+'相当' : (tiers.length ? '（条件未達）' : (h.yutai||'優待'));
+      const flag = heldM < 2 ? '（権利日直前取得・要確認）' : '';
+      events.push({label:`${y}年${rm}月権利`, what: what + flag, got: !!stage || !tiers.length});
+    }
+  }
+  return events;
+}
+
+function showStock(key){
+  const h = window.__holdIdx[key];
+  if(!h) return;
+  const dh = window.__divHist ? (window.__divHist[h.code] || Object.values(window.__divHist).find(v=>v.name && h.name.includes(v.name.slice(0,4)))) : null;
+  const isProvisional = /暫定/.test(h.memo);
+  let pl = '';
+  if(h.acqPrice && h.curPrice && h.shares){
+    const diff = Math.round((h.curPrice - h.acqPrice) * h.shares);
+    pl = `<div class="mrow"><div class="nm">含み損益${isProvisional?' <span class="badge unk">❓暫定単価</span>':''}</div><div class="amt" style="color:${diff>=0?'var(--green)':'var(--red)'}">${signed(diff)}</div></div>`;
+  }
+  let html = `<h3>${h.name} <span class="catchip">${h.acct||'口座不明'}</span></h3>
+    <div class="sub">${h.shares}株 ｜ 現在株価 ${h.curPrice?yen(h.curPrice):'—'} ｜ 取得単価 ${h.acqPrice?yen(h.acqPrice):'—'}${isProvisional?'（暫定）':''}</div>
+    <div class="mrow"><div class="nm">評価額</div><div class="amt" style="color:var(--net)">${yen(h.value)}</div></div>
+    ${pl}
+    <div class="mrow"><div class="nm">年間配当（額面 → 手取り目安）</div><div class="amt">${yen(h.divTotal)} → ${yen(h.divNet)}</div></div>`;
+  html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">💰 配当の受取実績</h4>`;
+  if(dh){
+    const years = Object.keys(dh.byYear).sort().reverse();
+    html += years.map(y=>`<div class="mrow"><div class="nm">${y}年</div><div class="amt">${yen(dh.byYear[y])}</div></div>`).join('');
+    html += `<div class="mrow" style="border-top:2px solid var(--line);"><div class="nm">累計（${dh.count}回）</div><div class="amt" style="font-size:15px;">${yen(dh.total)}</div></div>`;
+    html += `<div class="sub" style="margin-top:6px;">※日興・楽天・SBIの3口座分を収録。</div>`;
+  } else {
+    html += `<div class="sub">受取記録なし（楽天・SBI口座での受取、または配当履歴CSVが未設定の可能性）</div>`;
+  }
+  html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">🎁 優待</h4>
+    <div class="sub">${(h.detail||h.yutaiFull||'優待情報なし').replace(/\n/g,'<br>')}</div>
+    <div class="sub" style="margin-top:4px;">推定年間価値: ${h.yval?yen(h.yval):'—'} ｜ 権利月: ${h.rights||'—'}</div>`;
+  const yh = estimateYutaiHistory(h, window.__now || new Date());
+  if(yh && yh.length){
+    const gotList = yh.filter(e=>e.got);
+    html += `<h4 style="font-size:13px;font-weight:900;margin:14px 0 4px;">📦 優待の推定受取履歴（取得日から逆算・計${gotList.length}回）</h4>`;
+    html += yh.slice(-8).reverse().map(e=>`<div class="mrow"><div class="nm" style="font-weight:600;">${e.label}</div><div style="font-size:12px;color:${e.got?'var(--text)':'var(--dim)'}">${e.what}</div></div>`).join('');
+    if(yh.length>8) html += `<div class="sub">他 ${yh.length-8}回（取得日 ${parseAcqDate(h.memo).y}年${parseAcqDate(h.memo).m}月〜）</div>`;
+    html += `<div class="sub" style="margin-top:4px;">※権利確定情報からの推定です。実際の到着記録を付けたい場合は月次サイクルで「◯◯の優待届いた」と申告すればログ化できます。</div>`;
+  }
+  openModal(html);
+}
+
 function showMonth(mIdx){
   const now = window.__now, eligOnly = $('eligOnly').checked;
   const cal = window.__buildCal(eligOnly);
@@ -878,11 +998,14 @@ function showMonth(mIdx){
   let html = '<h3>'+(mIdx+1)+'月の優待・配当</h3><div class="sub">配当支払は「権利確定月＋3ヶ月」の概算。実際の支払月・金額は銘柄により前後します。</div>';
   html += '<h4 style="font-size:13px;font-weight:900;margin:10px 0 4px;">🎁 権利確定する優待（'+c.yutai.length+'銘柄）</h4>';
   if(c.yutai.length){
-    html += c.yutai.map(x=>`<div class="mrow"><div><span class="nm">${x.h.name}</span>${badge(x.e)}<div class="dt">${x.h.yutaiFull||x.h.yutai||''}</div></div><div class="amt">${x.h.yval?yen(x.h.yval):''}</div></div>`).join('');
+    html += c.yutai.map(x=>{
+      const desc = x.h.detail ? x.h.detail.replace(/\n/g,'<br>') : (x.h.yutaiFull||x.h.yutai||'');
+      return `<div class="mrow"><div><span class="nm">${x.h.name}</span>${badge(x.e)}<div class="dt">${desc}</div></div><div class="amt">${x.h.yval?yen(x.h.yval):''}</div></div>`;
+    }).join('');
   } else html += '<div class="sub">なし</div>';
   html += '<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">💰 支払われる配当（目安 合計 '+yen(divSum)+'）</h4>';
   if(c.div.length){
-    html += [...c.div].sort((a,b)=>b.amt-a.amt).map(x=>`<div class="mrow"><div class="nm">${x.name}</div><div class="amt">${yen(x.amt)}</div></div>`).join('');
+    html += [...c.div].sort((a,b)=>b.amt-a.amt).map(x=>`<div class="mrow"><div><span class="nm">${x.name}</span> <span class="catchip" style="font-size:9px;">${x.acct||''}</span></div><div class="amt">${yen(x.amt)}<span style="font-size:10px;color:var(--dim)"> 手取${yen(x.net)}</span></div></div>`).join('');
   } else html += '<div class="sub">なし</div>';
   openModal(html);
 }
