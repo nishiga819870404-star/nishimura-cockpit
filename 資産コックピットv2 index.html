@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>西村家 資産コックピット v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0B0E13; --panel:#12161F; --panel-edge:#1E2530;
+  --amber:#FFB300; --amber-dim:#7A5800;
+  --green:#00E676; --red:#FF5252; --blue:#4FC3F7;
+  --text:#D7DCE3; --dim:#6B7280;
+  --mono:"SF Mono","Consolas","Courier New",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  min-height:100vh;
+  background-image:radial-gradient(ellipse at 50% -20%, #17202E 0%, var(--bg) 60%);
+}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px 60px;}
+.ticker-band{background:#000;border-bottom:2px solid var(--amber-dim);overflow:hidden;white-space:nowrap;height:38px;display:flex;align-items:center;}
+.ticker-inner{display:inline-block;animation:scroll 70s linear infinite;font-family:var(--mono);font-size:14px;letter-spacing:0.05em;}
+.ticker-inner span{margin-right:36px;color:var(--amber);}
+.ticker-inner span b{color:var(--green);font-weight:600;}
+.ticker-inner span i{font-style:normal;color:var(--dim);}
+@keyframes scroll{0%{transform:translateX(20vw);}100%{transform:translateX(-100%);}}
+@media (prefers-reduced-motion:reduce){.ticker-inner{animation:none;}}
+header{padding:26px 0 18px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;}
+h1{font-size:20px;font-weight:800;letter-spacing:0.14em;}
+h1 small{display:block;font-family:var(--mono);font-size:10px;letter-spacing:0.3em;color:var(--amber);margin-bottom:4px;}
+.updated{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:right;}
+.updated button{background:none;border:1px solid var(--panel-edge);color:var(--dim);border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;margin-left:8px;}
+.updated button:hover{color:var(--amber);border-color:var(--amber);}
+
+/* setup */
+.setup{background:var(--panel);border:1px solid var(--panel-edge);border-radius:10px;padding:26px;max-width:720px;margin:20px auto;}
+.setup h2{font-size:14px;color:var(--amber);letter-spacing:0.1em;margin-bottom:14px;}
+.setup p{font-size:12.5px;line-height:1.8;color:var(--text);margin-bottom:14px;}
+.setup label{display:block;font-size:11px;color:var(--dim);margin:12px 0 4px;letter-spacing:0.08em;font-weight:700;}
+.setup input{width:100%;background:#0D1119;border:1px solid var(--panel-edge);border-radius:6px;color:var(--text);padding:9px 12px;font-family:var(--mono);font-size:11px;}
+.setup input:focus{outline:none;border-color:var(--amber);}
+.setup .go{margin-top:20px;width:100%;padding:13px;background:var(--amber);color:#000;font-weight:800;border:none;border-radius:6px;font-size:14px;letter-spacing:0.1em;cursor:pointer;}
+.setup .note{font-size:10.5px;color:var(--dim);line-height:1.7;margin-top:14px;}
+
+/* todo */
+.todo{border:1px solid var(--amber-dim);background:rgba(255,179,0,0.05);border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:12.5px;line-height:1.8;}
+.todo b{color:var(--amber);}
+.todo.hidden{display:none;}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:24px;}
+.kpi{background:var(--panel);border:1px solid var(--panel-edge);border-radius:8px;padding:16px 18px 14px;position:relative;overflow:hidden;}
+.kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent,var(--amber));}
+.kpi .label{font-size:11px;letter-spacing:0.15em;color:var(--dim);margin-bottom:8px;font-weight:700;}
+.kpi .value{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--accent,var(--amber));font-variant-numeric:tabular-nums;}
+.kpi .sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px;}
+.kpi .sub .up{color:var(--green);} .kpi .sub .down{color:var(--red);}
+
+.grid{display:grid;grid-template-columns:1fr;gap:16px;}
+@media(min-width:840px){.grid{grid-template-columns:3fr 2fr;}.grid .full{grid-column:1/-1;}}
+.panel{background:var(--panel);border:1px solid var(--panel-edge);border-radius:8px;padding:18px;}
+.panel h2{font-size:12px;letter-spacing:0.18em;color:var(--amber);font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.panel h2::before{content:"▮";font-size:10px;}
+
+.ycal{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.ycal .m{background:#0D1119;border:1px solid var(--panel-edge);border-radius:6px;padding:8px;min-height:74px;}
+.ycal .m .mn{font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:5px;}
+.ycal .m .cnt{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--green);}
+.ycal .m .names{font-size:9.5px;line-height:1.5;margin-top:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
+.ycal .m.now{border-color:var(--amber);}
+.ycal .m.now .mn{color:var(--amber);}
+
+.hold{width:100%;border-collapse:collapse;font-size:12.5px;}
+.hold th{text-align:left;font-size:10px;letter-spacing:0.1em;color:var(--dim);padding:4px 8px;border-bottom:1px solid var(--panel-edge);font-weight:700;}
+.hold td{padding:7px 8px;border-bottom:1px solid #161B25;}
+.hold td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums;}
+.hold td.name{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hold .bar-bg{height:4px;background:#1A2029;border-radius:2px;margin-top:3px;}
+.hold .bar-fg{height:100%;background:var(--amber);border-radius:2px;}
+
+.loan-track{height:16px;background:#0D1119;border:1px solid var(--panel-edge);border-radius:8px;overflow:hidden;margin:12px 0 8px;}
+.loan-fill{height:100%;background:linear-gradient(90deg,var(--green),#00B85C);width:0%;transition:width 1s ease;}
+.loan-meta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--dim);}
+.loan-meta b{color:var(--text);}
+canvas{max-width:100%;}
+.hint{font-size:11px;color:var(--dim);margin-top:10px;line-height:1.6;}
+.hidden{display:none;}
+footer{margin-top:36px;font-size:10.5px;color:var(--dim);text-align:center;line-height:1.7;}
+.err{background:rgba(255,82,82,0.08);border:1px solid var(--red);border-radius:8px;padding:14px;font-size:12px;line-height:1.7;margin:16px 0;}
+</style>
+</head>
+<body>
+
+<div class="ticker-band"><div class="ticker-inner" id="ticker"><span>NISHIMURA ASSET COCKPIT v2 <i>|</i> LOADING...</span></div></div>
+
+<div class="wrap">
+  <header>
+    <h1><small>NISHIMURA FAMILY OFFICE</small>資産コックピット <span style="font-family:var(--mono);font-size:12px;color:var(--dim);">v2</span></h1>
+    <div class="updated" id="updated">—<button id="reload">更新</button><button id="reconfig">設定</button></div>
+  </header>
+
+  <!-- 初期設定画面 -->
+  <div class="setup" id="setup">
+    <h2>初期設定（1回だけ）</h2>
+    <p>Google Sheetsの「西村家ファイナンスDB」で、<b>ファイル → 共有 → ウェブに公開</b> を開き、シートごとに「カンマ区切り(.csv)」で公開したURLを貼ってください。<br>
+    公開ダイアログで各シートを選ぶとURLが発行されます（gid=の数字がシートごとに変わります）。</p>
+    <label>資産スナップショット CSV URL（必須）</label>
+    <input id="u-snap" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
+    <label>月次収支 CSV URL（必須）</label>
+    <input id="u-cf" placeholder="同上">
+    <label>ポートフォリオ CSV URL（必須）</label>
+    <input id="u-port" placeholder="同上">
+    <label>負債 CSV URL（任意）</label>
+    <input id="u-loan" placeholder="同上">
+    <label>医療費 CSV URL（任意）</label>
+    <input id="u-med" placeholder="同上">
+    <button class="go" id="go">コックピット起動 →</button>
+    <div class="note">
+      設定はこのページのURL（#以降）に埋め込まれます。起動後のURLを<b>ブックマーク／ホーム画面に追加</b>すれば次回から設定不要です。<br>
+      ※「ウェブに公開」したCSVはURLを知っていれば誰でも閲覧可能です。第三者にURLを渡さないでください。
+    </div>
+  </div>
+
+  <div id="board" class="hidden">
+    <div class="todo hidden" id="todo"></div>
+
+    <div class="kpis">
+      <div class="kpi" style="--accent:var(--amber)">
+        <div class="label">純資産</div>
+        <div class="value" id="k-net">—</div>
+        <div class="sub" id="k-net-sub">—</div>
+      </div>
+      <div class="kpi" style="--accent:#B388FF">
+        <div class="label">優待株評価額</div>
+        <div class="value" id="k-port">—</div>
+        <div class="sub" id="k-port-sub">—</div>
+      </div>
+      <div class="kpi" style="--accent:var(--green)">
+        <div class="label">年間配当（税引前）</div>
+        <div class="value" id="k-div">—</div>
+        <div class="sub" id="k-div-sub">—</div>
+      </div>
+      <div class="kpi" style="--accent:var(--blue)">
+        <div class="label">今年の収支累計</div>
+        <div class="value" id="k-cf">—</div>
+        <div class="sub" id="k-cf-sub">—</div>
+      </div>
+      <div class="kpi" style="--accent:var(--red)">
+        <div class="label">レイク残高</div>
+        <div class="value" id="k-loan">—</div>
+        <div class="sub" id="k-loan-sub">—</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel full">
+        <h2>純資産の推移</h2>
+        <canvas id="netChart" height="120"></canvas>
+      </div>
+      <div class="panel">
+        <h2>月別収支（直近12ヶ月）</h2>
+        <canvas id="cfChart" height="220"></canvas>
+      </div>
+      <div class="panel">
+        <h2>優待カレンダー（権利確定月）</h2>
+        <div class="ycal" id="ycal"></div>
+        <div class="hint">枠点灯＝今月。数字＝その月に権利確定する保有銘柄数。</div>
+      </div>
+      <div class="panel">
+        <h2>保有トップ10（評価額）</h2>
+        <table class="hold">
+          <thead><tr><th>銘柄</th><th style="text-align:right">評価額</th><th style="text-align:right">年配当</th><th>優待</th></tr></thead>
+          <tbody id="holdBody"></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h2>レイク完済カウントダウン</h2>
+        <div class="loan-track"><div class="loan-fill" id="loanFill"></div></div>
+        <div class="loan-meta"><div>返済済 <b id="loanPaid">—</b></div><div>残り <b id="loanLeft">—</b></div></div>
+        <div class="hint" id="loanNote"></div>
+        <h2 style="margin-top:22px;">医療費控除チェック</h2>
+        <div id="medList" class="hint" style="margin-top:0;"></div>
+      </div>
+    </div>
+    <div id="errbox"></div>
+  </div>
+
+  <footer>データはGoogle Sheets（公開CSV）から読み込み、ブラウザ内でのみ処理されます。<br>スプシを更新→このページの「更新」を押すだけで最新化されます。</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
+const man = n => (n/10000).toLocaleString('ja-JP',{maximumFractionDigits:0}) + '万円';
+const signedYen = n => (n < 0 ? '−' : '+') + '¥' + Math.abs(Math.round(n)).toLocaleString('ja-JP');
+
+/* ---------- config via URL hash ---------- */
+function readConfig(){
+  try{
+    const h = location.hash.slice(1);
+    if(!h) return null;
+    return JSON.parse(decodeURIComponent(atob(h)));
+  }catch(e){ return null; }
+}
+function writeConfig(cfg){
+  location.hash = btoa(encodeURIComponent(JSON.stringify(cfg)));
+}
+
+/* ---------- tiny CSV parser (handles quotes) ---------- */
+function parseCSV(text){
+  const rows = []; let row = [], cur = '', q = false;
+  for(let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if(q){
+      if(ch === '"'){ if(text[i+1] === '"'){cur += '"'; i++;} else q = false; }
+      else cur += ch;
+    }else{
+      if(ch === '"') q = true;
+      else if(ch === ','){ row.push(cur); cur = ''; }
+      else if(ch === '\n'){ row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if(ch !== '\r') cur += ch;
+    }
+  }
+  if(cur !== '' || row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+const num = s => {
+  if(s == null) return null;
+  const t = String(s).replace(/[¥,\s円]/g,'').replace(/[（(]/,'-').replace(/[）)]/,'');
+  if(t === '' || t === '-') return null;
+  const v = parseFloat(t);
+  return isNaN(v) ? null : v;
+};
+const ym = s => {
+  const m = String(s).match(/(\d{4})[-\/年](\d{1,2})/);
+  return m ? {y:+m[1], m:+m[2]} : null;
+};
+
+async function fetchCSV(url){
+  const res = await fetch(url, {cache:'no-store'});
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  return parseCSV(await res.text());
+}
+
+/* ---------- setup flow ---------- */
+let CFG = readConfig();
+if(CFG){ $('setup').classList.add('hidden'); boot(); }
+
+$('go').addEventListener('click', () => {
+  const cfg = {
+    snap: $('u-snap').value.trim(), cf: $('u-cf').value.trim(),
+    port: $('u-port').value.trim(), loan: $('u-loan').value.trim(), med: $('u-med').value.trim()
+  };
+  if(!cfg.snap || !cfg.cf || !cfg.port){ alert('必須3つ（スナップショット・月次収支・ポートフォリオ）のURLを入れてください'); return; }
+  CFG = cfg; writeConfig(cfg);
+  $('setup').classList.add('hidden');
+  boot();
+});
+$('reload').addEventListener('click', () => { if(CFG) boot(); });
+$('reconfig').addEventListener('click', () => {
+  $('board').classList.add('hidden'); $('setup').classList.remove('hidden');
+  if(CFG){ $('u-snap').value=CFG.snap||''; $('u-cf').value=CFG.cf||''; $('u-port').value=CFG.port||''; $('u-loan').value=CFG.loan||''; $('u-med').value=CFG.med||''; }
+});
+
+/* ---------- data load & render ---------- */
+let netChart = null, cfChart = null;
+
+function countUp(el, target, fmt){
+  const dur = 900, t0 = performance.now();
+  function tick(t){
+    const p = Math.min((t-t0)/dur, 1);
+    el.textContent = fmt(target * (1 - Math.pow(1-p, 3)));
+    if(p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+async function boot(){
+  $('errbox').innerHTML = '';
+  const errs = [];
+  const get = async (url, label) => {
+    if(!url) return null;
+    try{ return await fetchCSV(url); }
+    catch(e){ errs.push(label + ': ' + e.message); return null; }
+  };
+  const [snap, cf, port, loan, med] = await Promise.all([
+    get(CFG.snap, '資産スナップショット'), get(CFG.cf, '月次収支'),
+    get(CFG.port, 'ポートフォリオ'), get(CFG.loan, '負債'), get(CFG.med, '医療費')
+  ]);
+  if(errs.length){
+    $('errbox').innerHTML = '<div class="err">読み込みエラー: ' + errs.join(' / ') + '<br>URLが「ウェブに公開」のCSV形式か確認してください。</div>';
+  }
+  if(!snap || !cf || !port){ $('board').classList.remove('hidden'); return; }
+  render({snap, cf, port, loan, med});
+  $('updated').firstChild.textContent = 'DATA: ' + new Date().toLocaleString('ja-JP');
+  $('board').classList.remove('hidden');
+}
+
+function render(d){
+  const now = new Date();
+  const todos = [];
+
+  /* --- snapshot series --- */
+  const snaps = [];
+  for(let i = 1; i < d.snap.length; i++){
+    const r = d.snap[i];
+    const date = ym(r[0]);
+    const cash = num(r[1]), emoney = num(r[2]);
+    const s1 = num(r[3]), s2 = num(r[4]), s3 = num(r[5]);
+    const debt = num(r[7]) || 0;
+    const net = num(r[8]);
+    if(!date) continue;
+    const hasData = [cash,emoney,s1,s2,s3].some(v => v !== null && v !== 0);
+    if(!hasData) continue;
+    snaps.push({date, cash:cash||0, emoney:emoney||0, sec:(s1||0)+(s2||0)+(s3||0), debt, net: net !== null ? net : (cash||0)+(emoney||0)+(s1||0)+(s2||0)+(s3||0)-debt});
+  }
+  snaps.sort((a,b) => (a.date.y*12+a.date.m) - (b.date.y*12+b.date.m));
+  const latest = snaps[snaps.length-1];
+  const prev = snaps[snaps.length-2];
+
+  if(latest){
+    countUp($('k-net'), latest.net, yen);
+    if(prev){
+      const diff = latest.net - prev.net;
+      $('k-net-sub').innerHTML = '前月比 <span class="' + (diff>=0?'up':'down') + '">' + signedYen(diff) + '</span>';
+    }else{
+      $('k-net-sub').textContent = latest.date.y + '年' + latest.date.m + '月時点';
+    }
+    if(latest.date.y !== now.getFullYear() || latest.date.m !== now.getMonth()+1){
+      todos.push('<b>今月のスナップショット未入力</b>（MF連携更新→スクショ→Claudeへ）');
+    }
+  }else{
+    todos.push('<b>スナップショットにデータがありません</b>');
+  }
+
+  /* --- portfolio --- */
+  const holdings = [];
+  for(let i = 1; i < d.port.length; i++){
+    const r = d.port[i];
+    const name = (r[1]||'').trim();
+    const value = num(r[6]);
+    if(!name || name === '合計' || value === null) continue;
+    holdings.push({
+      name, value,
+      divTotal: num(r[8]) || 0,
+      rightsMonth: r[10] || '',
+      yutai: (r[12]||'').split('/')[0].trim()
+    });
+  }
+  const totalVal = holdings.reduce((s,h)=>s+h.value,0);
+  const totalDiv = holdings.reduce((s,h)=>s+h.divTotal,0);
+  countUp($('k-port'), totalVal, yen);
+  $('k-port-sub').textContent = holdings.length + '銘柄 / 証券資産の' + (latest && latest.sec ? Math.round(totalVal/latest.sec*100) : '—') + '%';
+  countUp($('k-div'), totalDiv, yen);
+  $('k-div-sub').textContent = '月平均 ' + yen(totalDiv/12);
+
+  /* --- cashflow --- */
+  const byMonth = {}; // 'y-m' -> {inc, exp}
+  for(let i = 1; i < d.cf.length; i++){
+    const r = d.cf[i];
+    const date = ym(r[0]); const kubun = r[1]; const amt = num(r[3]);
+    if(!date || amt === null) continue;
+    const k = date.y + '-' + String(date.m).padStart(2,'0');
+    if(!byMonth[k]) byMonth[k] = {inc:0, exp:0};
+    if(kubun === '収入') byMonth[k].inc += amt; else byMonth[k].exp += amt;
+  }
+  const keys = Object.keys(byMonth).sort();
+  const last12 = keys.slice(-12);
+  const thisYear = keys.filter(k => k.startsWith(String(now.getFullYear())));
+  const cum = thisYear.reduce((s,k)=>s + byMonth[k].inc - byMonth[k].exp, 0);
+  const cfEl = $('k-cf');
+  countUp(cfEl, cum, signedYen);
+  cfEl.style.color = cum >= 0 ? 'var(--green)' : 'var(--red)';
+  $('k-cf-sub').textContent = now.getFullYear() + '年 記録済み' + thisYear.length + 'ヶ月分';
+  const lastCfKey = keys[keys.length-1];
+  if(lastCfKey){
+    const [ly, lm] = lastCfKey.split('-').map(Number);
+    const monthsBehind = (now.getFullYear()*12+now.getMonth()+1) - (ly*12+lm);
+    if(monthsBehind >= 2) todos.push('<b>月次収支が' + (monthsBehind-1) + 'ヶ月分未記録</b>（最終: ' + lastCfKey + '）');
+  }
+
+  /* --- loan --- */
+  let lake = null;
+  if(d.loan){
+    for(const r of d.loan){
+      if((r[0]||'').includes('レイク')){
+        lake = {initial: num(r[1]), current: num(r[2]), end: r[5]||''};
+        break;
+      }
+    }
+  }
+  if(lake && lake.initial){
+    countUp($('k-loan'), lake.current, yen);
+    $('k-loan-sub').textContent = '完済予定 ' + lake.end;
+    const paid = lake.initial - lake.current;
+    const pct = Math.min(100, Math.round(paid/lake.initial*100));
+    setTimeout(()=>{ $('loanFill').style.width = pct + '%'; }, 200);
+    $('loanPaid').textContent = yen(paid) + '（' + pct + '%）';
+    $('loanLeft').textContent = yen(lake.current);
+    $('loanNote').textContent = '12月からのまとめ返済10万×4回で前倒し完済コース。';
+  }else{
+    $('k-loan').textContent = '—';
+    $('k-loan-sub').textContent = '負債シート未接続';
+  }
+
+  /* --- charts --- */
+  if(netChart) netChart.destroy();
+  netChart = new Chart($('netChart'), {
+    type:'line',
+    data:{
+      labels: snaps.map(s => s.date.y + '/' + s.date.m),
+      datasets:[{
+        label:'純資産', data: snaps.map(s=>s.net),
+        borderColor:'#FFB300', backgroundColor:'rgba(255,179,0,0.12)',
+        fill:true, tension:0.3, pointRadius:4, borderWidth:2.5
+      }]
+    },
+    options:{
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#6B7280',font:{size:10}},grid:{color:'#1A2029'}},
+        y:{ticks:{color:'#6B7280',font:{size:10},callback:v=>(v/10000).toLocaleString()+'万'},grid:{color:'#1A2029'}}
+      }
+    }
+  });
+
+  if(cfChart) cfChart.destroy();
+  cfChart = new Chart($('cfChart'), {
+    type:'bar',
+    data:{
+      labels: last12.map(k=>k.slice(2).replace('-','/')),
+      datasets:[
+        {label:'収入', data:last12.map(k=>byMonth[k].inc), backgroundColor:'rgba(0,230,118,0.75)', borderRadius:3},
+        {label:'支出', data:last12.map(k=>byMonth[k].exp), backgroundColor:'rgba(255,82,82,0.7)', borderRadius:3},
+        {label:'手残り', data:last12.map(k=>byMonth[k].inc-byMonth[k].exp), type:'line', borderColor:'#FFB300', backgroundColor:'#FFB300', tension:0.25, pointRadius:3, borderWidth:2}
+      ]
+    },
+    options:{
+      plugins:{legend:{labels:{color:'#9CA3AF',font:{size:11}}}},
+      scales:{
+        x:{ticks:{color:'#6B7280',font:{size:10}},grid:{color:'#1A2029'}},
+        y:{ticks:{color:'#6B7280',font:{size:10},callback:v=>(v/10000)+'万'},grid:{color:'#1A2029'}}
+      }
+    }
+  });
+
+  /* --- yutai calendar --- */
+  const cal = Array.from({length:12}, ()=>[]);
+  holdings.forEach(h=>{
+    (String(h.rightsMonth).match(/(\d+)月/g)||[]).forEach(m=>{
+      const idx = parseInt(m)-1;
+      if(idx>=0 && idx<12) cal[idx].push(h.name);
+    });
+  });
+  const nowM = now.getMonth();
+  $('ycal').innerHTML = cal.map((list,i)=>`
+    <div class="m ${i===nowM?'now':''}">
+      <div class="mn">${i+1}月</div><div class="cnt">${list.length||'−'}</div>
+      <div class="names">${list.slice(0,3).join('、')}${list.length>3?' 他':''}</div>
+    </div>`).join('');
+
+  /* --- holdings top10 --- */
+  const top = [...holdings].sort((a,b)=>b.value-a.value).slice(0,10);
+  const maxV = top[0] ? top[0].value : 1;
+  $('holdBody').innerHTML = top.map(h=>`
+    <tr>
+      <td class="name">${h.name}<div class="bar-bg"><div class="bar-fg" style="width:${Math.round(h.value/maxV*100)}%"></div></div></td>
+      <td class="num">${yen(h.value)}</td>
+      <td class="num">${h.divTotal?yen(h.divTotal):'−'}</td>
+      <td style="font-size:11px;color:var(--dim);">${h.yutai||'−'}</td>
+    </tr>`).join('');
+
+  /* --- medical --- */
+  if(d.med){
+    const medY = {};
+    for(let i=1;i<d.med.length;i++){
+      const y = num(d.med[i][0]); const amt = num(d.med[i][2]);
+      if(y && amt) medY[y] = (medY[y]||0)+amt;
+    }
+    const ks = Object.keys(medY).sort();
+    $('medList').innerHTML = ks.length ? ks.map(y=>{
+      const over = medY[y] >= 100000;
+      return `${y}年: <b style="color:${over?'var(--green)':'var(--text)'}">${yen(medY[y])}</b>${over?' ✓控除ライン到達':''} <span style="color:var(--dim)">（10万まで残${over?0:yen(100000-medY[y]).slice(1)}）</span>`;
+    }).join('<br>') : 'データなし';
+  }else{
+    $('medList').textContent = '医療費シート未接続';
+  }
+
+  /* --- todo --- */
+  const todoEl = $('todo');
+  if(todos.length){ todoEl.innerHTML = '📋 ' + todos.join('　/　'); todoEl.classList.remove('hidden'); }
+  else todoEl.classList.add('hidden');
+
+  /* --- ticker --- */
+  $('ticker').innerHTML = holdings.map(h=>`<span>${h.name} <b>${man(h.value)}</b>${h.yutai?` <i>[${h.yutai}]</i>`:''}</span>`).join('') || '<span>NO DATA</span>';
+}
+</script>
+</body>
+</html>
