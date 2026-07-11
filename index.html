@@ -1070,8 +1070,9 @@ function showStock(key){
   const h = window.__holdIdx[key];
   if(!h) return;
   const norm = s => String(s||'').replace(/[Ａ-Ｚａ-ｚ０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/\s/g,'');
-  let dh = window.__divHist ? window.__divHist[h.code] : null;
-  if(!dh && window.__divHist){
+  let dh = (window.__divHist && h.code) ? window.__divHist[h.code] : null;
+  // フォールバックはコードが無い銘柄のみ。かつ完全名一致のみ（誤クロスマッチ防止）
+  if(!dh && window.__divHist && !h.code){
     dh = Object.values(window.__divHist).find(v => v.name && norm(v.name) === norm(h.name));
   }
   const isProvisional = /暫定/.test(h.memo);
