@@ -264,6 +264,8 @@ canvas{max-width:100%;}
     <input id="u-report">
     <label>配当履歴 CSV URL（任意・配当受取実績の表示用）</label>
     <input id="u-hist">
+    <label>固定費 CSV URL（任意・固定費一覧の表示用）</label>
+    <input id="u-fixed">
     <button class="go" id="go">ダッシュボード起動 →</button>
     <p class="note" style="margin-top:14px;">設定はURLの#以降に保存されます。起動後のURLをブックマーク／ホーム画面に追加してください。<br>※公開CSVのURLは第三者に渡さないこと。</p>
   </div>
@@ -337,6 +339,12 @@ canvas{max-width:100%;}
         </div>
       </div>
 
+      <div class="card" id="bankCard" style="display:none;">
+        <h2>口座・投信の内訳 <span class="tag">最新月</span></h2>
+        <div id="bankRows"></div>
+        <div class="note">スプシの資産スナップショットにJ列:りそな / K列:城北信金 / L列:楽天投信 / M列:SBI投信 を追記すると、月末残高の内訳がここに出ます。</div>
+      </div>
+
       <div class="grid2">
         <div class="card">
           <h2>純資産の推移</h2>
@@ -392,27 +400,22 @@ canvas{max-width:100%;}
       </div>
     </section>
 
-    <!-- ===== page: detail ===== -->
+    <!-- ===== page: detail (v7: カレンダー形式) ===== -->
     <section id="p-detail" class="hidden">
       <div class="card">
-        <h2>今年の支出内訳 <span class="tag" id="catYearTag"></span></h2>
-        <canvas id="catChart" height="240"></canvas>
-        <div class="note">2026年のここまでの実績を大分類で表示。カード明細・レシートの取込が進むほど内訳が精密になっていきます。</div>
+        <h2>収支カレンダー <span class="tag" id="cfCalYear"></span> <span class="tag">月をクリックで明細</span></h2>
+        <div class="ycal" id="cfcal"></div>
+        <div class="note">🔵収入 🔴支出。カード支払いはクリックした先でさらに内訳（購入明細）まで掘れます。</div>
       </div>
+
       <div class="card">
-        <h2>費目一覧 <span class="tag">クリックで推移グラフ</span></h2>
-        <div id="itemList"></div>
+        <h2>固定費・支払いサイクル <span class="tag">毎月の目処</span></h2>
+        <div id="fixedList"><div class="note">スプシに「固定費」シート（列: 種別/名称/金額/支払日/支払元/終了・更新月/メモ）を作ってCSV公開すると、ここに毎月の固定費・カード支払日・年払いの更新月が一覧表示されます。金額が変動するもの（カード等）は金額欄を空にすればOK。</div></div>
       </div>
+
       <div class="card">
-        <h2>支出明細（直近から100件）</h2>
-        <table class="t" id="detailTable">
-          <thead><tr><th>年月</th><th>費目</th><th>支払方法</th><th style="text-align:right">支出</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div class="card" id="meisaiCard">
-        <h2>レシート明細（購入明細） <span class="tag">健康チェック</span></h2>
-        <div id="meisaiBody"><div class="note">購入明細のCSV URLを設定すると、レシートから取り込んだ品目データと健康タグ集計がここに表示されます。</div></div>
+        <h2>カテゴリ別集計 <span class="tag" id="catMatrixYear"></span></h2>
+        <div id="catMatrix"><div class="note">レシート・カード明細の取込が始まると、電気代・食費などのカテゴリ×月の一覧がここに育ちます。</div></div>
       </div>
     </section>
 
@@ -443,14 +446,7 @@ canvas{max-width:100%;}
         <div class="note">🎁＝権利確定する優待銘柄。💰＝配当支払の目安額（権利月＋3ヶ月で概算）。✅＝長期条件クリア／⏳＝あと少し／❓＝取得日不明。</div>
       </div>
 
-      <div class="card">
-        <h2>保有銘柄一覧（評価額順）</h2>
-        <table class="t" id="holdTable">
-          <thead><tr><th>銘柄</th><th>口座</th><th style="text-align:right">評価額</th><th style="text-align:right">年配当(額面/手取)</th><th>権利月</th><th>優待</th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <div class="note">銘柄をクリックすると、取得単価・含み損益・これまでの配当受取履歴が見られます。</div>
-      </div>
+</div>
     </section>
 
     <!-- ===== page: report ===== -->
@@ -543,7 +539,7 @@ document.querySelectorAll('.navitem').forEach(el=>{
 let CFG = readCfg();
 if(CFG){ $('setup').classList.add('hidden'); boot(); }
 $('go').addEventListener('click',()=>{
-  const c={snap:$('u-snap').value.trim(),cf:$('u-cf').value.trim(),port:$('u-port').value.trim(),loan:$('u-loan').value.trim(),meisai:$('u-meisai').value.trim(),report:$('u-report').value.trim(),hist:$('u-hist').value.trim()};
+  const c={snap:$('u-snap').value.trim(),cf:$('u-cf').value.trim(),port:$('u-port').value.trim(),loan:$('u-loan').value.trim(),meisai:$('u-meisai').value.trim(),report:$('u-report').value.trim(),hist:$('u-hist').value.trim(),fixed:$('u-fixed').value.trim()};
   // v2互換: med設定は無視
   if(!c.snap||!c.cf||!c.port){alert('必須3つのURLを入れてください');return;}
   CFG=c;writeCfg(c);$('setup').classList.add('hidden');boot();
@@ -551,7 +547,7 @@ $('go').addEventListener('click',()=>{
 $('reload').addEventListener('click',()=>{if(CFG)boot();});
 $('reconfig').addEventListener('click',()=>{
   $('app').classList.add('hidden');$('setup').classList.remove('hidden');
-  if(CFG){$('u-snap').value=CFG.snap||'';$('u-cf').value=CFG.cf||'';$('u-port').value=CFG.port||'';$('u-loan').value=CFG.loan||'';$('u-meisai').value=CFG.meisai||'';$('u-report').value=CFG.report||'';$('u-hist').value=CFG.hist||'';}
+  if(CFG){$('u-snap').value=CFG.snap||'';$('u-cf').value=CFG.cf||'';$('u-port').value=CFG.port||'';$('u-loan').value=CFG.loan||'';$('u-meisai').value=CFG.meisai||'';$('u-report').value=CFG.report||'';$('u-hist').value=CFG.hist||'';$('u-fixed').value=CFG.fixed||'';}
 });
 
 /* ---- charts registry ---- */
@@ -591,7 +587,7 @@ function closeModal(){const ov=$('ov'); if(ov)ov.remove(); if(charts['modalChart
 
 /* ---- 優待の権利達成判定 ---- */
 function parseAcqDate(memo){
-  const m = String(memo||'').match(/(20\d{2})[\/\.年](\d{1,2})/);
+  const m = String(memo||'').match(/(20\d{2})[\/\.\-年](\d{1,2})/);
   return m ? {y:+m[1], m:+m[2]} : null;
 }
 function eligibility(h, now){
@@ -616,13 +612,17 @@ async function boot(){
   $('errbox').innerHTML='';
   const errs=[];
   const get=async(u,l)=>{ if(!u)return null; try{return await fetchCSV(u);}catch(e){errs.push(l+': '+e.message);return null;} };
-  const [snap,cf,port,loan,meisai,report,hist]=await Promise.all([
-    get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート'),get(CFG.hist,'配当履歴')
+  const [snap,cf,port,loan,meisai,report,hist,fixed]=await Promise.all([
+    get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート'),get(CFG.hist,'配当履歴'),get(CFG.fixed,'固定費')
   ]);
   if(errs.length) $('errbox').innerHTML='<div class="err">読み込みエラー: '+errs.join(' / ')+'<br>URLが「ウェブに公開」のCSV形式か確認してください。</div>';
   if(!snap||!cf||!port){$('app').classList.remove('hidden');return;}
-  render({snap,cf,port,loan,meisai,report,hist});
-  $('stamp').textContent='更新: '+new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  try{
+    render({snap,cf,port,loan,meisai,report,hist,fixed});
+    $('stamp').textContent='更新: '+new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    $('errbox').innerHTML='<div class="err">描画エラー: '+(e.message||e)+'<br>この画面のスクショをClaudeに送ってください。<br><span style="font-size:10px;">'+(e.stack||'').split('\n').slice(0,3).join('<br>')+'</span></div>';
+  }
   $('app').classList.remove('hidden');
 }
 
@@ -638,7 +638,8 @@ function render(d){
     const cash=num(r[1]),em=num(r[2]),s1=num(r[3]),s2=num(r[4]),s3=num(r[5]);
     const debt=num(r[7])||0;const net=num(r[8]);
     if(![cash,em,s1,s2,s3].some(v=>v!==null&&v!==0))continue;
-    snaps.push({dt,cash:cash||0,em:em||0,rk:s1||0,nikko:s2||0,sbi:s3||0,debt,
+    const risona=num(r[9]),johoku=num(r[10]),rkFund=num(r[11]),sbiFund=num(r[12]);
+    snaps.push({dt,cash:cash||0,em:em||0,rk:s1||0,nikko:s2||0,sbi:s3||0,debt,risona,johoku,rkFund,sbiFund,
       asset:(cash||0)+(em||0)+(s1||0)+(s2||0)+(s3||0),
       net: net!==null?net:(cash||0)+(em||0)+(s1||0)+(s2||0)+(s3||0)-debt});
   }
@@ -675,6 +676,16 @@ function render(d){
   },options:{plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:10.5},boxWidth:12,padding:10}}},
     scales:{x:{stacked:false,ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
       y:{stacked:true,ticks:{color:'#8A93A6',font:{size:10},callback:v=>man(v)},grid:{color:'#EDF0F7'}}}}});
+
+  /* 口座・投信の内訳 */
+  if(latest && (latest.risona!==null || latest.johoku!==null || latest.rkFund!==null || latest.sbiFund!==null)){
+    $('bankCard').style.display='';
+    const items=[
+      ['🏦 りそな銀行', latest.risona], ['🏦 城北信用金庫', latest.johoku],
+      ['📈 楽天証券・投信（積立）', latest.rkFund], ['📈 SBI証券・投信（積立）', latest.sbiFund]
+    ].filter(x=>x[1]!==null);
+    $('bankRows').innerHTML = items.map(([lb,v])=>`<div class="mrow"><div class="nm">${lb}</div><div class="amt" style="color:var(--net)">${yen(v)}</div></div>`).join('');
+  }
 
   /* pie: ポートフォリオ計算後に描画（下方へ移動） */
 
@@ -765,74 +776,89 @@ function render(d){
       <td><div class="bar-wrap"><span class="num" style="min-width:70px;font-size:11.5px;">${man(v.exp)}円</span><div class="bar exp" style="width:${Math.round(v.exp/maxAmt*100)}%"></div></div></td></tr>`;
   }).join('');
 
-  /* ===== category stacked (大分類ベース) ===== */
-  window.__cfRows = [];  // 項目詳細モーダル用に保持
+  /* ===== v7: 収支カレンダー・固定費・カテゴリ集計 ===== */
+  window.__cfRows = [];
+  window.__cfIncome = [];
   for(let i=1;i<d.cf.length;i++){
     const r=d.cf[i];const dt=ym(r[0]);const amt=num(r[3]);
-    if(!dt||amt===null||r[1]==='収入')continue;
-    if(dt.y*12+dt.m > nowKey) continue; // 未来の予定行は除外
-    window.__cfRows.push({y:dt.y,m:dt.m,item:r[2]||'',amt,pay:r[4]||''});
+    if(!dt||amt===null)continue;
+    if(dt.y*12+dt.m > nowKey) continue;
+    if(r[1]==='収入') window.__cfIncome.push({y:dt.y,m:dt.m,item:r[2]||'',amt});
+    else window.__cfRows.push({y:dt.y,m:dt.m,item:r[2]||'',amt,pay:r[4]||''});
   }
-  const bigByYear={}, itemTotals={}, itemBig={};
-  window.__cfRows.forEach(r=>{
-    const bc=bigCat(r.item);
-    if(!bigByYear[r.y])bigByYear[r.y]={};
-    bigByYear[r.y][bc]=(bigByYear[r.y][bc]||0)+r.amt;
-    itemTotals[r.item]=(itemTotals[r.item]||0)+r.amt;
-    itemBig[r.item]=bc;
-  });
-  const bigOrder=['住まい','食費・日用','貯蓄・投資','ローン返済','健康・美容','通信','サブスク','交通','その他'];
-  const thisY = now.getFullYear();
-  $('catYearTag').textContent = thisY + '年 実績';
-  const yearCats = bigByYear[thisY] || {};
-  const catLabels = bigOrder.filter(c=>yearCats[c]);
-  mkChart('catChart',{type:'doughnut',data:{
-    labels:catLabels,
-    datasets:[{data:catLabels.map(c=>yearCats[c]),backgroundColor:catLabels.map((c,i)=>CAT_COLORS[bigOrder.indexOf(c)%CAT_COLORS.length]),borderWidth:2,borderColor:'#fff'}]
-  },options:{plugins:{legend:{position:'right',labels:{color:'#2E3440',font:{size:11},padding:10,
-    generateLabels:(chart)=>{
-      const total=chart.data.datasets[0].data.reduce((s,v)=>s+v,0);
-      return chart.data.labels.map((l,i)=>({text:`${l}  ${yen(chart.data.datasets[0].data[i])} (${Math.round(chart.data.datasets[0].data[i]/total*100)}%)`,fillStyle:chart.data.datasets[0].backgroundColor[i],fontColor:'#2E3440'}));
-    }}},
-    tooltip:{callbacks:{label:c=>c.label+': '+yen(c.parsed)}}},cutout:'55%'}});
-
-  /* 項目リスト（大分類ごと・クリックで推移モーダル） */
-  const grouped={};
-  Object.entries(itemTotals).forEach(([item,total])=>{
-    const bc=itemBig[item];
-    if(!grouped[bc])grouped[bc]=[];
-    grouped[bc].push({item,total});
-  });
-  $('itemList').innerHTML = bigOrder.filter(bc=>grouped[bc]).map(bc=>
-    '<div style="margin-bottom:14px;"><div style="font-weight:900;font-size:13px;color:var(--header);margin-bottom:6px;">'+bc+'</div>'+
-    grouped[bc].sort((a,b)=>b.total-a.total).map(g=>
-      `<div class="mrow clickable" onclick="showItemChart('${g.item.replace(/'/g,"\\'")}')">
-        <div><span class="nm">${g.item}</span><div class="dt">累計 ${yen(g.total)}</div></div>
-        <div style="color:var(--dim);font-size:18px;">›</div>
-      </div>`).join('')+'</div>'
-  ).join('');
-
-  /* detail table: latest 100 expense rows */
-  const detRows=[];
-  for(let i=d.cf.length-1;i>=1&&detRows.length<100;i--){
-    const r=d.cf[i];if(!r||r[1]==='収入')continue;
-    const dt=ym(r[0]);const amt=num(r[3]);if(!dt||amt===null)continue;
-    detRows.push(`<tr><td>${dt.y}-${String(dt.m).padStart(2,'0')}</td><td>${r[2]||''}</td><td style="color:var(--dim)">${r[4]||''}</td><td class="num">${yen(amt)}</td></tr>`);
-  }
-  $('detailTable').querySelector('tbody').innerHTML=detRows.join('');
-
-  /* meisai */
-  if(d.meisai&&d.meisai.length>1){
-    const tags={};let rows=[];
+  // 購入明細（レシート・カード内訳）: 日付/店舗/品名/金額/支払方法/カテゴリ
+  window.__meisai = [];
+  if(d.meisai && d.meisai.length>1){
     for(let i=1;i<d.meisai.length;i++){
-      const r=d.meisai[i];const amt=num(r[3]);if(!r[2]||amt===null)continue;
-      const tag=r[5]||'その他';tags[tag]=(tags[tag]||0)+amt;
-      rows.push(`<tr><td>${r[0]||''}</td><td style="color:var(--dim)">${r[1]||''}</td><td>${r[2]}</td><td class="num">${yen(amt)}</td><td><span class="chip" style="background:#F0F2FA;border-radius:5px;padding:2px 7px;font-size:10px;">${tag}</span></td></tr>`);
+      const r=d.meisai[i];const dt=ym(r[0]);const amt=num(r[3]);
+      if(!dt||amt===null||!r[2])continue;
+      window.__meisai.push({y:dt.y,m:dt.m,store:r[1]||'',item:r[2],amt,pay:r[4]||'',cat:r[5]||'その他'});
     }
-    const tagSummary=Object.entries(tags).sort((a,b)=>b[1]-a[1]).map(([t,v])=>`${t}: <b>${yen(v)}</b>`).join('　');
-    $('meisaiBody').innerHTML=`<div class="note" style="margin:0 0 12px;font-size:12.5px;">健康タグ集計: ${tagSummary}</div>
-      <table class="t"><thead><tr><th>日付</th><th>店舗</th><th>品名</th><th style="text-align:right">金額</th><th>タグ</th></tr></thead>
-      <tbody>${rows.slice(-60).reverse().join('')}</tbody></table>`;
+  }
+
+  /* --- 収支カレンダー --- */
+  const thisY = now.getFullYear();
+  $('cfCalYear').textContent = thisY + '年';
+  const cfByM = Array.from({length:12},()=>({inc:0,exp:0,has:false}));
+  window.__cfIncome.forEach(r=>{if(r.y===thisY){cfByM[r.m-1].inc+=r.amt;cfByM[r.m-1].has=true;}});
+  window.__cfRows.forEach(r=>{if(r.y===thisY){cfByM[r.m-1].exp+=r.amt;cfByM[r.m-1].has=true;}});
+  $('cfcal').innerHTML = cfByM.map((c,i)=>`
+    <div class="ymonth ${i===now.getMonth()?'now':''} ${c.has?'clickable':''}" ${c.has?`onclick="showCfMonth(${i})"`:''} style="${c.has?'':'opacity:0.45;'}">
+      <div class="mh"><span class="mn">${i+1}月</span></div>
+      ${c.has?`
+        <div class="sec">収入</div><div style="font-size:13px;font-weight:800;color:var(--income);">${c.inc?yen(c.inc):'—'}</div>
+        <div class="sec">支出</div><div style="font-size:13px;font-weight:800;color:var(--expense);">${c.exp?yen(c.exp):'—'}</div>
+        <div class="sec">手残り</div><div style="font-size:12px;font-weight:800;color:${c.inc-c.exp>=0?'var(--green)':'var(--red)'};">${signed(c.inc-c.exp)}</div>
+      `:'<div class="sec">データなし</div>'}
+    </div>`).join('');
+
+  /* --- 固定費一覧（固定費CSVから） --- */
+  if(d.fixed && d.fixed.length>1){
+    const groups = {'毎月':[], 'カード':[], '年払い':[], 'ローン':[], 'その他':[]};
+    for(let i=1;i<d.fixed.length;i++){
+      const r=d.fixed[i];
+      if(!r[1])continue;
+      const kind=(r[0]||'その他').trim();
+      const g = groups[kind] ? kind : 'その他';
+      groups[g].push({name:r[1],amt:num(r[2]),day:r[3]||'',src:r[4]||'',until:r[5]||'',memo:r[6]||''});
+    }
+    let html='';
+    const order=[['ローン','🏠 ローン'],['毎月','📅 毎月の固定費'],['カード','💳 カード支払い（金額は使った分）'],['年払い','🗓 年払い・更新月'],['その他','その他']];
+    let monthlyTotal=0;
+    for(const [key,label] of order){
+      if(!groups[key].length)continue;
+      html+=`<div style="font-weight:900;font-size:13px;color:var(--header);margin:12px 0 4px;">${label}</div>`;
+      html+=groups[key].map(f=>{
+        if((key==='毎月'||key==='ローン')&&f.amt)monthlyTotal+=f.amt;
+        return `<div class="mrow"><div><span class="nm">${f.name}</span><div class="dt">${f.day?f.day+'日払い':''}${f.src?'・'+f.src:''}${f.until?'・'+f.until+'まで':''}${f.memo?'・'+f.memo:''}</div></div><div class="amt" style="color:var(--net)">${f.amt?yen(f.amt):'変動'}</div></div>`;
+      }).join('');
+    }
+    html=`<div class="alert" style="margin-bottom:10px;">毎月の固定費（ローン込み・確定分のみ）: <b>${yen(monthlyTotal)}</b></div>`+html;
+    $('fixedList').innerHTML=html;
+  }
+
+  /* --- カテゴリ別集計（購入明細から: カテゴリ×月マトリクス） --- */
+  if(window.__meisai.length){
+    $('catMatrixYear').textContent = thisY + '年';
+    const cats={};
+    window.__meisai.forEach(r=>{
+      if(r.y!==thisY)return;
+      if(!cats[r.cat])cats[r.cat]=Array(12).fill(0);
+      cats[r.cat][r.m-1]+=r.amt;
+    });
+    const catNames=Object.keys(cats).sort((a,b)=>cats[b].reduce((s,v)=>s+v,0)-cats[a].reduce((s,v)=>s+v,0));
+    if(catNames.length){
+      let html='<div style="overflow-x:auto;"><table class="t"><thead><tr><th>カテゴリ</th>';
+      for(let m2=1;m2<=12;m2++)html+=`<th style="text-align:right;font-size:10px;">${m2}月</th>`;
+      html+='<th style="text-align:right;">年計</th></tr></thead><tbody>';
+      catNames.forEach(c=>{
+        html+=`<tr><td><b>${c}</b></td>`;
+        cats[c].forEach(v=>html+=`<td class="num" style="font-size:11px;">${v?Math.round(v/1000)+'k':''}</td>`);
+        html+=`<td class="num" style="font-weight:800;">${yen(cats[c].reduce((s,v)=>s+v,0))}</td></tr>`;
+      });
+      html+='</tbody></table></div><div class="note">単位: k=千円。レシート・カード明細を取り込むほど精密になります。</div>';
+      $('catMatrix').innerHTML=html;
+    }
   }
 
   /* ===== yutai/dividend calendar (v4: クリック・権利判定・トグル) ===== */
@@ -878,13 +904,7 @@ function render(d){
   const sorted=[...holdings].sort((a,b)=>b.value-a.value);
   window.__holdIdx = {};
   sorted.forEach((h,i)=>window.__holdIdx[h.name+'|'+h.acct]=h);
-  $('holdTable').querySelector('tbody').innerHTML=sorted.map(h=>`
-    <tr class="clickable" onclick="showStock('${(h.name+'|'+h.acct).replace(/'/g,"\\'")}')">
-    <td><b>${h.name}</b></td>
-    <td><span class="catchip" style="${h.acct.includes('NISA')?'background:#E3F7EF;color:#1B9E77;':''}">${h.acct||'−'}</span></td>
-    <td class="num">${yen(h.value)}</td>
-    <td class="num" style="color:var(--green)">${h.divTotal?yen(h.divTotal)+' / '+yen(h.divNet):'−'}</td>
-    <td>${h.rights||'−'}</td><td style="font-size:11.5px;color:var(--dim)">${h.yutai||'−'}</td></tr>`).join('');
+
 
   /* ===== loan ===== */
   let lake=null;
@@ -900,6 +920,40 @@ function render(d){
   /* alerts */
   renderReports(d.report);
   $('alertbox').innerHTML=alerts.length?'<div class="alert">📋 '+alerts.join('<br>')+'</div>':'';
+}
+
+/* ===== v7 収支カレンダー用 ===== */
+function showCfMonth(mIdx){
+  const now = window.__now || new Date();
+  const y = now.getFullYear();
+  const m = mIdx + 1;
+  const inc = (window.__cfIncome||[]).filter(r=>r.y===y&&r.m===m);
+  const exp = (window.__cfRows||[]).filter(r=>r.y===y&&r.m===m);
+  const meisai = (window.__meisai||[]).filter(r=>r.y===y&&r.m===m);
+  let html = `<h3>${y}年${m}月の収支明細</h3><div class="sub">カード行をクリックすると購入明細の内訳が見られます</div>`;
+  html += `<h4 style="font-size:13px;font-weight:900;margin:12px 0 4px;color:var(--income);">🔵 収入 合計 ${yen(inc.reduce((s,r)=>s+r.amt,0))}</h4>`;
+  html += inc.length ? inc.map(r=>`<div class="mrow"><div class="nm">${r.item}</div><div class="amt" style="color:var(--income)">${yen(r.amt)}</div></div>`).join('') : '<div class="sub">なし</div>';
+  html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;color:var(--expense);">🔴 支出 合計 ${yen(exp.reduce((s,r)=>s+r.amt,0))}</h4>`;
+  html += exp.sort((a,b)=>b.amt-a.amt).map(r=>{
+    const isCard = /カード|メルペイ|ジャックス|ビュー/.test(r.item);
+    const hasDetail = meisai.some(x=>x.pay && r.item.includes(x.pay.slice(0,3)));
+    if(isCard){
+      return `<div class="mrow clickable" onclick="showCardDetail(${y},${m},'${r.item.replace(/'/g,"\\'")}')"><div><span class="nm">${r.item}</span><div class="dt">クリックで内訳${hasDetail?'':'（明細未取込）'}</div></div><div class="amt" style="color:var(--expense)">${yen(r.amt)} ›</div></div>`;
+    }
+    return `<div class="mrow"><div class="nm">${r.item}</div><div class="amt" style="color:var(--expense)">${yen(r.amt)}</div></div>`;
+  }).join('');
+  openModal(html);
+}
+function showCardDetail(y,m,cardItem){
+  const rows = (window.__meisai||[]).filter(r=>r.y===y&&r.m===m&&r.pay&&cardItem.includes(r.pay.slice(0,3)));
+  let html = `<h3>${cardItem}</h3><div class="sub">${y}年${m}月分の内訳（購入明細より）</div>`;
+  if(rows.length){
+    html += rows.sort((a,b)=>b.amt-a.amt).map(r=>`<div class="mrow"><div><span class="nm">${r.item}</span><div class="dt">${r.store}・${r.cat}</div></div><div class="amt" style="color:var(--net)">${yen(r.amt)}</div></div>`).join('');
+    html += `<div class="mrow" style="border-top:2px solid var(--line);"><div class="nm">内訳合計</div><div class="amt">${yen(rows.reduce((s,r)=>s+r.amt,0))}</div></div>`;
+  } else {
+    html += '<div class="sub">このカードの明細はまだ取り込まれていません。カード明細のスクショをClaudeに投げて「取り込んで」と言うと、ここに内訳が入ります。</div>';
+  }
+  openModal(html);
 }
 
 /* ===== v4/v5 グローバル関数 ===== */
@@ -958,7 +1012,11 @@ function estimateYutaiHistory(h, now){
 function showStock(key){
   const h = window.__holdIdx[key];
   if(!h) return;
-  const dh = window.__divHist ? (window.__divHist[h.code] || Object.values(window.__divHist).find(v=>v.name && h.name.includes(v.name.slice(0,4)))) : null;
+  const norm = s => String(s||'').replace(/[Ａ-Ｚａ-ｚ０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/\s/g,'');
+  let dh = window.__divHist ? window.__divHist[h.code] : null;
+  if(!dh && window.__divHist){
+    dh = Object.values(window.__divHist).find(v => v.name && norm(v.name) === norm(h.name));
+  }
   const isProvisional = /暫定/.test(h.memo);
   let pl = '';
   if(h.acqPrice && h.curPrice && h.shares){
@@ -1002,8 +1060,21 @@ function showMonth(mIdx){
   html += '<h4 style="font-size:13px;font-weight:900;margin:10px 0 4px;">🎁 権利確定する優待（'+c.yutai.length+'銘柄）</h4>';
   if(c.yutai.length){
     html += c.yutai.map(x=>{
-      const desc = x.h.detail ? x.h.detail.replace(/\n/g,'<br>') : (x.h.yutaiFull||x.h.yutai||'');
-      return `<div class="mrow"><div><span class="nm">${x.h.name}</span>${badge(x.e)}<div class="dt">${desc}</div></div><div class="amt">${x.h.yval?yen(x.h.yval):''}</div></div>`;
+      const h = x.h;
+      const desc = h.detail ? h.detail.replace(/\n/g,'<br>') : (h.yutaiFull||h.yutai||'');
+      // 次の段階の予告（⏳のとき）
+      let nextLine = '';
+      if(x.e.s==='wait') nextLine = `<div class="dt" style="color:#C77700;font-weight:700;">⏳ ${x.e.label}で次の段階へ</div>`;
+      return `<div class="mrow clickable" onclick="event.stopPropagation();showStock('${(h.name+'|'+h.acct).replace(/'/g,"\\'")}')">
+        <div style="flex:1;">
+          <span class="nm">${h.name}</span>
+          <span class="catchip" style="margin-left:6px;${h.acct.includes('NISA')?'background:#E3F7EF;color:#1B9E77;':''}">${h.acct||''} ${h.shares}株</span>
+          ${badge(x.e)}
+          <div class="dt">${desc}</div>
+          ${nextLine}
+        </div>
+        <div style="color:var(--dim);font-size:16px;align-self:center;">›</div>
+      </div>`;
     }).join('');
   } else html += '<div class="sub">なし</div>';
   html += '<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">💰 支払われる配当（目安 合計 '+yen(divSum)+'）</h4>';
