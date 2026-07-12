@@ -674,6 +674,30 @@ const CAT_RULES = [
   ['交通', ['Suica','ガソリン']],
   ['食費・日用', ['メルペイ','その他楽天','その他三井住友','Amazonカード','イオンカード','その他現金']],
 ];
+/* v10: 「その他」の自動再分類辞書（西村回答 2026-07-12。正本: data/分類ルール.csv） */
+const RECLASS = [
+ ['スーパー',['生鮮市場','オーケー','ベルクス','ジェーソン','ダイソー','アタック']],
+ ['外食',['ＡｍａｚｏｎＰａｙ提携','はま寿司','なか卯','大戸屋','五右衛門','魚べい','酒場ジャロウ','越後屋喜八郎']],
+ ['運動',['コナミスポーツ']],
+ ['ファッション',['ＲＥＺＡＲ']],
+ ['趣味・娯楽',['あみあみ','ﾃﾞｲ-ｴﾑｴﾑ','JINS','ＪＩＮＳ']],
+ ['家具・インテリア',['アットホームインテリア']],
+ ['ふるさと納税',['大分県大分市','茨城県笠間市','静岡県沼津市','ふるさと']],
+ ['学習',['Ｍｉｃｈｉｋｕｓａ']],
+ ['修理・保全',['くらしのマーケット']],
+ ['選挙・政治',['センキヨド']],
+ ['寄付',['議員','寄付']],
+ ['公共料金',['チバケンエイスイドウ']],
+ ['通信',['ﾎﾟｳﾞｵ']],
+ ['サブスク・AI',['RING']],
+ ['ドラッグストア',['楽天２４']],
+];
+function catOverride(text, cat){
+  if(cat && cat!=='その他') return cat; /* 手動分類済みは尊重、その他だけ再分類 */
+  for(const [c,keys] of RECLASS){ if(keys.some(k=>String(text).includes(k))) return c; }
+  return cat||'その他';
+}
+
 function bigCat(item){
   for(const [cat, keys] of CAT_RULES){
     if(keys.some(k=>String(item).includes(k))) return cat;
@@ -867,7 +891,7 @@ function render(d){
     for(let i=1;i<d.meisai.length;i++){
       const r=d.meisai[i];const dt=ym(r[0]);const amt=num(r[3]);
       if(!dt||amt===null||!r[2])continue;
-      window.__meisai.push({y:dt.y,m:dt.m,store:r[1]||'',item:r[2],amt,pay:r[4]||'',cat:r[5]||'その他'});
+      window.__meisai.push({y:dt.y,m:dt.m,store:r[1]||'',item:r[2],amt,pay:r[4]||'',cat:catOverride((r[1]||'')+' '+(r[2]||''), r[5]||'その他')});
     }
   }
 
