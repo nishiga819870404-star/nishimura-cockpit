@@ -266,6 +266,12 @@ canvas{max-width:100%;}
     <input id="u-hist">
     <label>固定費 CSV URL（任意・固定費一覧の表示用）</label>
     <input id="u-fixed">
+    <label>収入明細 CSV URL（任意・給与/賞与の内訳表示用）</label>
+    <input id="u-income">
+    <label>ウォッチリスト CSV URL（任意・狙ってる株の表示用）</label>
+    <input id="u-watch">
+    <label>欲しいものリスト CSV URL（任意）</label>
+    <input id="u-wish">
     <button class="go" id="go">ダッシュボード起動 →</button>
     <p class="note" style="margin-top:14px;">設定はこの端末（ブラウザ）に自動保存されます。<b>入力は初回の1回だけ</b>で、次回からはそのまま起動します。<br>別の端末で使うときは、起動後の「#」付きURLを送ってブックマークすれば設定ごと引き継げます。<br>※公開CSVのURLと#付きURLは第三者に渡さないこと。ブラウザの閲覧データを全消去すると設定も消えるので、#付きURLのブックマークを保険に。</p>
   </div>
@@ -343,6 +349,11 @@ canvas{max-width:100%;}
         <h2>口座・投信の内訳 <span class="tag">最新月</span></h2>
         <div id="bankRows"></div>
         <div class="note">スプシの資産スナップショットにJ列:りそな / K列:城北信金 / L列:楽天投信 / M列:SBI投信 を追記すると、月末残高の内訳がここに出ます。</div>
+      </div>
+
+      <div class="card">
+        <h2>🛍 欲しいものリスト <span class="tag">大きい買い物の計画</span></h2>
+        <div id="wishList"><div class="note">チャットで「◯◯を欲しいものリストに入れて」と言うとここに貯まります。スプシに「欲しいものリスト」シート（列: 追加日/品名/カテゴリ/推定価格/優先度/状態/メモ・URL）を作ってCSV公開し、⚙設定にURLを入れると表示されます。</div></div>
       </div>
 
       <div class="grid2">
@@ -441,6 +452,11 @@ canvas{max-width:100%;}
         <label class="toggle"><input type="checkbox" id="eligOnly"> 権利条件を達成している優待のみ表示</label>
         <div class="ycal" id="ycal"></div>
         <div class="note">🎁＝権利確定する優待銘柄。💰＝配当支払の目安額（権利月＋3ヶ月で概算）。✅＝長期条件クリア／⏳＝あと少し／❓＝取得日不明。</div>
+      </div>
+
+      <div class="card">
+        <h2>🎯 ウォッチリスト <span class="tag">狙ってる株</span></h2>
+        <div id="watchList"><div class="note">チャットで「◯◯どう思う？」→分析→「◯◯をウォッチに入れて、目標△円で」と言うとここに貯まります。スプシに「ウォッチリスト」シート（列: 銘柄コード/銘柄名/権利確定月/目標取得株価/現在株価(最終確認)/優待内容メモ/登録日/メモ）を作ってCSV公開し、⚙設定にURLを入れると表示されます。</div></div>
       </div>
 
     </section>
@@ -545,9 +561,11 @@ canvas{max-width:100%;}
           <li>「今月分<b>棚卸しして</b>。FPレポートまで出して」</li>
           <li>「<b>優待レーダー回して</b>。3月権利以外の候補も教えて」</li>
           <li>「◯◯を<b>ウォッチに入れて、目標△円で</b>」</li>
+          <li>「◯◯を<b>欲しいものリストに入れて</b>。値段も調べて」（資産サマリーのカードに貯まる）</li>
           <li>「今日◯◯を100株△円で<b>買った</b>」（ポートフォリオ自動更新）</li>
           <li>「◯◯の<b>優待届いた</b>」（受取ログ記録）</li>
           <li>「<b>健康レポート出して</b>。間食と外食の前月比」</li>
+          <li>「給与明細のスクショ、<b>取り込んで</b>」（収入明細に追加→収入クリックで内訳表示）</li>
           <li>「<b>ポケカレーダー</b>。締切近い順で」</li>
         </ul>
 
@@ -628,7 +646,7 @@ document.querySelectorAll('.navitem').forEach(el=>{
 let CFG = readCfg();
 if(CFG){ $('setup').classList.add('hidden'); boot(); }
 $('go').addEventListener('click',()=>{
-  const c={snap:$('u-snap').value.trim(),cf:$('u-cf').value.trim(),port:$('u-port').value.trim(),loan:$('u-loan').value.trim(),meisai:$('u-meisai').value.trim(),report:$('u-report').value.trim(),hist:$('u-hist').value.trim(),fixed:$('u-fixed').value.trim()};
+  const c={snap:$('u-snap').value.trim(),cf:$('u-cf').value.trim(),port:$('u-port').value.trim(),loan:$('u-loan').value.trim(),meisai:$('u-meisai').value.trim(),report:$('u-report').value.trim(),hist:$('u-hist').value.trim(),fixed:$('u-fixed').value.trim(),income:$('u-income').value.trim(),watch:$('u-watch').value.trim(),wish:$('u-wish').value.trim()};
   // v2互換: med設定は無視
   if(!c.snap||!c.cf||!c.port){alert('必須3つのURLを入れてください');return;}
   CFG=c;writeCfg(c);$('setup').classList.add('hidden');boot();
@@ -636,7 +654,7 @@ $('go').addEventListener('click',()=>{
 $('reload').addEventListener('click',()=>{if(CFG)boot();});
 $('reconfig').addEventListener('click',()=>{
   $('app').classList.add('hidden');$('setup').classList.remove('hidden');
-  if(CFG){$('u-snap').value=CFG.snap||'';$('u-cf').value=CFG.cf||'';$('u-port').value=CFG.port||'';$('u-loan').value=CFG.loan||'';$('u-meisai').value=CFG.meisai||'';$('u-report').value=CFG.report||'';$('u-hist').value=CFG.hist||'';$('u-fixed').value=CFG.fixed||'';}
+  if(CFG){$('u-snap').value=CFG.snap||'';$('u-cf').value=CFG.cf||'';$('u-port').value=CFG.port||'';$('u-loan').value=CFG.loan||'';$('u-meisai').value=CFG.meisai||'';$('u-report').value=CFG.report||'';$('u-hist').value=CFG.hist||'';$('u-fixed').value=CFG.fixed||'';$('u-income').value=CFG.income||'';$('u-watch').value=CFG.watch||'';$('u-wish').value=CFG.wish||'';}
 });
 
 /* ---- charts registry ---- */
@@ -701,13 +719,13 @@ async function boot(){
   $('errbox').innerHTML='';
   const errs=[];
   const get=async(u,l)=>{ if(!u)return null; try{return await fetchCSV(u);}catch(e){errs.push(l+': '+e.message);return null;} };
-  const [snap,cf,port,loan,meisai,report,hist,fixed]=await Promise.all([
-    get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート'),get(CFG.hist,'配当履歴'),get(CFG.fixed,'固定費')
+  const [snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish]=await Promise.all([
+    get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート'),get(CFG.hist,'配当履歴'),get(CFG.fixed,'固定費'),get(CFG.income,'収入明細'),get(CFG.watch,'ウォッチリスト'),get(CFG.wish,'欲しいものリスト')
   ]);
   if(errs.length) $('errbox').innerHTML='<div class="err">読み込みエラー: '+errs.join(' / ')+'<br>URLが「ウェブに公開」のCSV形式か確認してください。</div>';
   if(!snap||!cf||!port){$('app').classList.remove('hidden');return;}
   try{
-    render({snap,cf,port,loan,meisai,report,hist,fixed});
+    render({snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish});
     $('stamp').textContent='更新: '+new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   }catch(e){
     $('errbox').innerHTML='<div class="err">描画エラー: '+(e.message||e)+'<br>この画面のスクショをClaudeに送ってください。<br><span style="font-size:10px;">'+(e.stack||'').split('\n').slice(0,3).join('<br>')+'</span></div>';
@@ -833,6 +851,15 @@ function render(d){
     if(dt.y*12+dt.m > nowKey) continue;
     if(r[1]==='収入') window.__cfIncome.push({y:dt.y,m:dt.m,item:r[2]||'',amt});
     else window.__cfRows.push({y:dt.y,m:dt.m,item:r[2]||'',amt,pay:r[4]||''});
+  }
+  // 収入明細（給与・賞与の内訳）: 支払年月/勤務対象月/種別/区分/項目/金額/備考
+  window.__paydetail = [];
+  if(d.income && d.income.length>1){
+    for(let i=1;i<d.income.length;i++){
+      const r=d.income[i]; if(!r[0]||!r[4])continue;
+      const amt=num(r[5]); if(amt===null)continue;
+      window.__paydetail.push({ym:String(r[0]).slice(0,7),work:r[1]||'',type:r[2]||'給与',kubun:r[3]||'',item:r[4],amt,note:r[6]||''});
+    }
   }
   // 購入明細（レシート・カード内訳）: 日付/店舗/品名/金額/支払方法/カテゴリ
   window.__meisai = [];
@@ -1044,6 +1071,8 @@ function render(d){
 
   /* alerts */
   renderReports(d.report);
+  renderWatch(d.watch);
+  renderWish(d.wish);
   $('alertbox').innerHTML=alerts.length?'<div class="alert">📋 '+alerts.join('<br>')+'</div>':'';
 }
 
@@ -1070,7 +1099,7 @@ function showCfMonth(mIdx){
   const meisai = (window.__meisai||[]).filter(r=>r.y===y&&r.m===m);
   let html = `<h3>${y}年${m}月の収支明細</h3><div class="sub">カード行をクリックすると購入明細の内訳が見られます</div>`;
   html += `<h4 style="font-size:13px;font-weight:900;margin:12px 0 4px;color:var(--income);">🔵 収入 合計 ${yen(inc.reduce((s,r)=>s+r.amt,0))}</h4>`;
-  html += inc.length ? inc.map(r=>`<div class="mrow"><div class="nm">${r.item}</div><div class="amt" style="color:var(--income)">${yen(r.amt)}</div></div>`).join('') : '<div class="sub">なし</div>';
+  html += inc.length ? inc.map(r=>`<div class="mrow clickable" onclick="showIncomeChart('${String(r.item).replace(/'/g,"\\'")}',${y},${m})"><div><span class="nm">${r.item}</span><div class="dt">クリックで推移</div></div><div class="amt" style="color:var(--income)">${yen(r.amt)} ›</div></div>`).join('') : '<div class="sub">なし</div>';
   html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;color:var(--expense);">🔴 支出 合計 ${yen(exp.reduce((s,r)=>s+r.amt,0))}</h4>`;
   html += exp.sort((a,b)=>b.amt-a.amt).map(r=>{
     const isCard = /カード|メルペイ|ジャックス|ビュー|三井住友|楽天|Amazon|ミツイスミトモ/.test(r.item);
@@ -1257,6 +1286,44 @@ function showItemChart(item){
     options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8A93A6',font:{size:9},maxTicksLimit:14},grid:{display:false}},y:{ticks:{color:'#8A93A6',font:{size:10},callback:v=>(v/10000)+'万'},grid:{color:'#EDF0F7'}}}}});
 }
 
+function showIncomeChart(item,py,pm){
+  const rows = (window.__cfIncome||[]).filter(r=>r.item===item).sort((a,b)=>(a.y*12+a.m)-(b.y*12+b.m));
+  if(!rows.length) return;
+  /* 給与/賞与明細（収入明細CSV）があればその月の内訳を出す */
+  let slip='';
+  const pd=window.__paydetail||[];
+  if(pd.length){
+    const type = /賞与/.test(item)?'賞与':'給与';
+    let ym = (py&&pm)? py+'-'+String(pm).padStart(2,'0') : null;
+    let mine = ym? pd.filter(r=>r.ym===ym&&r.type===type) : [];
+    if(!mine.length){ const yms=[...new Set(pd.filter(r=>r.type===type).map(r=>r.ym))].sort(); if(yms.length){ym=yms[yms.length-1]; mine=pd.filter(r=>r.ym===ym&&r.type===type);} }
+    if(mine.length){
+      const sect=(kb,color)=>{
+        const xs=mine.filter(r=>r.kubun===kb); if(!xs.length)return '';
+        return xs.map(r=>`<div class="mrow"><div><span class="nm">${r.item}</span>${r.note?`<div class="dt">${r.note}</div>`:''}</div><div class="amt" style="color:${color}">${yen(r.amt)}</div></div>`).join('');
+      };
+      const pay=mine.filter(r=>r.kubun==='支給').reduce((s,r)=>s+r.amt,0);
+      const ded=mine.filter(r=>r.kubun==='控除'&&!/健保に含む/.test(r.note)).reduce((s,r)=>s+r.amt,0);
+      const ted=mine.find(r=>r.kubun==='集計');
+      slip = `<h4 style="font-size:13px;font-weight:900;margin:12px 0 4px;">📄 ${ym} ${type}明細（勤務: ${mine[0].work||'—'}）</h4>
+        <div class="sub" style="margin-bottom:4px;">額面 ${yen(pay)} − 控除 ${yen(ded)} ${mine.some(r=>r.kubun==='調整')?'+ 経費精算 ':''}→ 手取り <b>${ted?yen(ted.amt):'—'}</b>（手取り率 ${ted&&pay?Math.round(ted.amt/pay*1000)/10:'—'}%）</div>`
+        + sect('支給','var(--income)') + sect('控除','var(--expense)') + sect('調整','var(--net)')
+        + (ted?`<div class="mrow" style="border-top:2px solid var(--line);"><div class="nm"><b>手取り</b>${ted.note?`<div class="dt">${ted.note}</div>`:''}</div><div class="amt" style="color:var(--green)"><b>${yen(ted.amt)}</b></div></div>`:'');
+    }
+  }
+  const labels = rows.map(r=>r.y+'/'+r.m);
+  const vals = rows.map(r=>r.amt);
+  const byY = {};
+  rows.forEach(r=>byY[r.y]=(byY[r.y]||0)+r.amt);
+  const avg = vals.reduce((s,v)=>s+v,0)/vals.length;
+  const yearRows = Object.keys(byY).sort().reverse().map(y=>`<div class="mrow"><div class="nm">${y}年</div><div class="amt" style="color:var(--income)">${yen(byY[y])}</div></div>`).join('');
+  openModal('<h3>🔵 '+item+'</h3><div class="sub">月ごとの入金推移と年間合計｜月平均 '+yen(Math.round(avg))+'</div>'+slip+'<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">推移</h4><canvas id="modalCanvas" height="200"></canvas><h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">年間合計</h4>'+yearRows);
+  try{
+    charts['modalChart'] = new Chart($('modalCanvas'),{type:'bar',data:{labels,datasets:[{label:item,data:vals,backgroundColor:'#1B9E77',borderRadius:4}]},
+      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8A93A6',font:{size:9},maxTicksLimit:14},grid:{display:false}},y:{ticks:{color:'#8A93A6',font:{size:10},callback:v=>(v/10000)+'万'},grid:{color:'#EDF0F7'}}}}});
+  }catch(e){}
+}
+
 function mdLite(s){
   return String(s||'').split(/\n/).map(line=>{
     line = line.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
@@ -1265,6 +1332,33 @@ function mdLite(s){
     if(line.trim()==='') return '';
     return '<p>'+line+'</p>';
   }).join('');
+}
+function renderWatch(w){
+  if(!w||w.length<2)return;
+  const rows=[];
+  for(let i=1;i<w.length;i++){const r=w[i]; if(!r[1])continue; rows.push({code:r[0]||'',name:r[1],month:r[2]||'',target:num(r[3]),targetRaw:r[3]||'',cur:num(r[4]),yutai:r[5]||'',memo:r[7]||''});}
+  if(!rows.length)return;
+  let html='<table class="t"><thead><tr><th>銘柄</th><th>権利月</th><th style="text-align:right;">目標</th><th style="text-align:right;">現在</th><th>判定</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    let judge='—';
+    if(r.target&&r.cur){ judge = r.cur<=r.target ? '<b style="color:var(--green)">🎯 目標圏内!</b>' : ('あと'+Math.round((r.cur-r.target)/r.target*100)+'%'); }
+    else if(!r.target) judge='<span style="color:var(--dim)">目標未設定</span>';
+    html+=`<tr><td><b>${r.name}</b><div class="dt">${r.code}${r.yutai?'・'+r.yutai:''}</div></td><td>${r.month}</td><td class="num">${r.target?yen(r.target):(r.targetRaw||'—')}</td><td class="num">${r.cur?yen(r.cur):'—'}</td><td>${judge}</td></tr>`;
+  });
+  html+='</tbody></table><div class="note">追加は「◯◯をウォッチに入れて、目標△円で」／分析は「◯◯どう思う？」。月次レーダーが目標圏内🎯と権利月接近👀を見張ります。</div>';
+  $('watchList').innerHTML=html;
+}
+function renderWish(w){
+  if(!w||w.length<2)return;
+  const rows=[];
+  for(let i=1;i<w.length;i++){const r=w[i]; if(!r[1])continue; rows.push({date:r[0]||'',name:r[1],cat:r[2]||'',price:num(r[3]),pri:r[4]||'',state:r[5]||'',memo:r[6]||''});}
+  if(!rows.length)return;
+  const active=rows.filter(r=>!/購入済|済/.test(r.state));
+  const total=active.reduce((s,r)=>s+(r.price||0),0);
+  let html=`<div class="alert" style="margin-bottom:10px;">未購入 ${active.length}件 ／ 合計目安 <b>${yen(total)}</b></div>`;
+  rows.sort((a,b)=>String(a.pri).localeCompare(String(b.pri)));
+  html+=rows.map(r=>`<div class="mrow"><div><span class="nm">${/購入済|済/.test(r.state)?'✅ ':''}${r.name}</span><div class="dt">${[r.cat,r.pri?'優先度'+r.pri:'',r.date,r.memo].filter(Boolean).join('・')}</div></div><div class="amt" style="color:var(--net)">${r.price?yen(r.price):'—'}</div></div>`).join('');
+  $('wishList').innerHTML=html;
 }
 function renderReports(rep){
   if(!rep || rep.length<2) return;
