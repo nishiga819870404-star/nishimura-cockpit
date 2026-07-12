@@ -318,13 +318,13 @@ canvas{max-width:100%;}
       </div>
 
       <div class="kpis">
-        <div class="kpi" style="--accent:var(--purple)">
-          <div class="lb">優待株評価額</div>
+        <div class="kpi clickable" style="--accent:var(--purple)" onclick="showPortBreakdown()" title="クリックで銘柄別内訳">
+          <div class="lb">優待株評価額 <span style="font-size:10px;color:#8A93A6;">›内訳</span></div>
           <div class="val" id="k-port">—</div>
           <div class="sub" id="k-port-sub">—</div>
         </div>
-        <div class="kpi" style="--accent:var(--green)">
-          <div class="lb">年間配当（税引前）</div>
+        <div class="kpi clickable" style="--accent:var(--green)" onclick="showDivBreakdown()" title="クリックで銘柄別内訳">
+          <div class="lb">年間配当（税引前） <span style="font-size:10px;color:#8A93A6;">›内訳</span></div>
           <div class="val" id="k-div">—</div>
           <div class="sub" id="k-div-sub">—</div>
         </div>
@@ -333,8 +333,8 @@ canvas{max-width:100%;}
           <div class="val" id="k-cf">—</div>
           <div class="sub" id="k-cf-sub">—</div>
         </div>
-        <div class="kpi" style="--accent:var(--red)">
-          <div class="lb">レイク残高</div>
+        <div class="kpi clickable" style="--accent:var(--red)" onclick="showLakePlan()" title="クリックで返済計画">
+          <div class="lb">レイク残高 <span style="font-size:10px;color:#8A93A6;">›返済計画</span></div>
           <div class="val" id="k-loan">—</div>
           <div class="sub" id="k-loan-sub">—</div>
         </div>
@@ -346,7 +346,7 @@ canvas{max-width:100%;}
       </div>
 
       <div class="card" id="bankCard" style="display:none;">
-        <h2>口座・投信の内訳 <span class="tag">最新月</span></h2>
+        <h2 class="clickable" onclick="showBankCompare()" title="クリックで前月比較">口座・投信の内訳 <span class="tag">最新月</span> <span style="font-size:11px;color:#8A93A6;font-weight:600;">›前月と比較</span></h2>
         <div id="bankRows"></div>
         <div class="note">スプシの資産スナップショットにJ列:りそな / K列:城北信金 / L列:楽天投信 / M列:SBI投信 を追記すると、月末残高の内訳がここに出ます。</div>
       </div>
@@ -795,6 +795,8 @@ function render(d){
   }
   snaps.sort((a,b)=>(a.dt.y*12+a.dt.m)-(b.dt.y*12+b.dt.m));
   const latest=snaps[snaps.length-1], prev=snaps[snaps.length-2];
+  window.__snaps = snaps;
+  window.__loanRows = d.loan || null;
 
   if(latest){
     $('snap-date').textContent=latest.dt.y+'年'+latest.dt.m+'月時点';
@@ -827,14 +829,17 @@ function render(d){
     scales:{x:{stacked:false,ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
       y:{stacked:true,ticks:{color:'#8A93A6',font:{size:10},callback:v=>man(v)},grid:{color:'#EDF0F7'}}}}});
 
-  /* 口座・投信の内訳 */
+  /* 口座・投信の内訳（前月比つき） */
   if(latest && (latest.risona!==null || latest.johoku!==null || latest.rkFund!==null || latest.sbiFund!==null)){
     $('bankCard').style.display='';
     const items=[
-      ['🏦 りそな銀行', latest.risona], ['🏦 城北信用金庫', latest.johoku],
-      ['📈 楽天証券・投信（積立）', latest.rkFund], ['📈 SBI証券・投信（積立）', latest.sbiFund]
+      ['🏦 りそな銀行', latest.risona, prev?prev.risona:null], ['🏦 城北信用金庫', latest.johoku, prev?prev.johoku:null],
+      ['📈 楽天証券・投信（積立）', latest.rkFund, prev?prev.rkFund:null], ['📈 SBI証券・投信（積立）', latest.sbiFund, prev?prev.sbiFund:null]
     ].filter(x=>x[1]!==null);
-    $('bankRows').innerHTML = items.map(([lb,v])=>`<div class="mrow"><div class="nm">${lb}</div><div class="amt" style="color:var(--net)">${yen(v)}</div></div>`).join('');
+    $('bankRows').innerHTML = items.map(([lb,v,pv])=>{
+      const diff = (pv!==null&&pv!==undefined) ? `<div class="dt" style="color:${v-pv>=0?'var(--green)':'var(--red)'};">前月比 ${signed(v-pv)}</div>` : '';
+      return `<div class="mrow"><div><span class="nm">${lb}</span>${diff}</div><div class="amt" style="color:var(--net)">${yen(v)}</div></div>`;
+    }).join('');
   }
 
   /* pie: ポートフォリオ計算後に描画（下方へ移動） */
@@ -1055,11 +1060,12 @@ function render(d){
       for(let m2=1;m2<=12;m2++)html+=`<th style="text-align:right;font-size:10px;">${m2}月</th>`;
       html+='<th style="text-align:right;">年計</th></tr></thead><tbody>';
       catNames.forEach(c=>{
-        html+=`<tr><td><b>${c}</b></td>`;
-        cats[c].forEach(v=>html+=`<td class="num" style="font-size:11px;">${v?Math.round(v/1000)+'k':''}</td>`);
-        html+=`<td class="num" style="font-weight:800;">${yen(cats[c].reduce((s,v)=>s+v,0))}</td></tr>`;
+        const cq = c.replace(/'/g,"\\'");
+        html+=`<tr><td class="clickable" onclick="showCatYear('${cq}')" title="クリックで年間内訳"><b>${c}</b> <span style="font-size:9px;color:#8A93A6;">›</span></td>`;
+        cats[c].forEach((v,mi)=>html+=`<td class="num ${v?'clickable':''}" ${v?`onclick="showCatMonth('${cq}',${mi+1})"`:''} style="font-size:11px;">${v?Math.round(v/1000)+'k':''}</td>`);
+        html+=`<td class="num clickable" onclick="showCatYear('${cq}')" style="font-weight:800;">${yen(cats[c].reduce((s,v)=>s+v,0))}</td></tr>`;
       });
-      html+='</tbody></table></div><div class="note">単位: k=千円。レシート・カード明細を取り込むほど精密になります。</div>';
+      html+='</tbody></table></div><div class="note">単位: k=千円。<b>カテゴリ名クリック→年間内訳、数字クリック→その月の内訳</b>。レシート・カード明細を取り込むほど精密になります。</div>';
       $('catMatrix').innerHTML=html;
     }
   }
@@ -1128,6 +1134,14 @@ function render(d){
 }
 
 /* ===== v8 カテゴリ内訳 ===== */
+function monthNav(fnCall, m){
+  /* 前月/次月ナビ（1〜12月の範囲でループ） */
+  const pm = m===1?12:m-1, nm = m===12?1:m+1;
+  return `<div style="display:flex;justify-content:space-between;gap:8px;margin-top:14px;border-top:1px solid var(--line);padding-top:10px;">
+    <button class="navbtn" onclick="${fnCall.replace('__M__',pm)}" style="border:1px solid var(--line);background:#F5F7FD;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">← ${pm}月へ</button>
+    <button class="navbtn" onclick="${fnCall.replace('__M__',nm)}" style="border:1px solid var(--line);background:#F5F7FD;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">${nm}月へ →</button>
+  </div>`;
+}
 function showCatMonth(cat, m){
   const now = window.__now || new Date();
   const y = now.getFullYear();
@@ -1136,7 +1150,120 @@ function showCatMonth(cat, m){
   if(rows.length){
     html += rows.map(r=>`<div class="mrow"><div><span class="nm">${r.item}</span><div class="dt">${r.store}・${r.pay}</div></div><div class="amt" style="color:var(--net)">${yen(r.amt)}</div></div>`).join('');
     html += `<div class="mrow" style="border-top:2px solid var(--line);"><div class="nm">合計（${rows.length}件）</div><div class="amt">${yen(rows.reduce((s,r)=>s+r.amt,0))}</div></div>`;
-  } else html += '<div class="sub">明細なし</div>';
+  } else html += '<div class="sub">この月の明細なし</div>';
+  html += monthNav(`showCatMonth('${cat.replace(/'/g,"\\'")}',__M__)`, m);
+  openModal(html);
+}
+function showCatYear(cat){
+  const now = window.__now || new Date();
+  const y = now.getFullYear();
+  const rows = (window.__meisai||[]).filter(r=>r.y===y && r.cat===cat);
+  const byM = Array(12).fill(0); rows.forEach(r=>byM[r.m-1]+=r.amt);
+  const total = byM.reduce((s,v)=>s+v,0);
+  const maxV = Math.max(...byM,1);
+  let html = `<h3>${cat} — ${y}年の推移</h3><div class="sub">合計 ${yen(total)}（${rows.length}件）。月をクリックで明細</div>`;
+  byM.forEach((v,i)=>{
+    if(!v) return;
+    html += `<div class="mrow clickable" onclick="showCatMonth('${cat.replace(/'/g,"\\'")}',${i+1})">
+      <div style="flex:1;"><span class="nm">${i+1}月</span>
+        <div style="height:8px;background:#EDF0F7;border-radius:4px;margin-top:4px;"><div style="height:8px;width:${Math.round(v/maxV*100)}%;background:var(--purple);border-radius:4px;"></div></div>
+      </div><div class="amt" style="margin-left:12px;color:var(--net)">${yen(v)} ›</div></div>`;
+  });
+  openModal(html);
+}
+
+/* ===== 資産サマリー タイル内訳 ===== */
+function showPortBreakdown(){
+  const hs = [...(window.__holdings||[])].sort((a,b)=>b.value-a.value);
+  if(!hs.length){openModal('<h3>優待株評価額</h3><div class="sub">データなし</div>');return;}
+  const total = hs.reduce((s,h)=>s+h.value,0);
+  let html = `<h3>優待株評価額の内訳</h3><div class="sub">${hs.length}銘柄・合計 ${yen(total)}。銘柄クリックで詳細</div>`;
+  hs.forEach(h=>{
+    const pct = (h.value/total*100).toFixed(1);
+    html += `<div class="mrow clickable" onclick="showStock('${(h.name+'|'+h.acct).replace(/'/g,"\\'")}')">
+      <div style="flex:1;"><span class="nm">${h.name}</span><div class="dt">${h.acct}・${h.shares}株${h.curPrice?'・@'+h.curPrice.toLocaleString():''}</div>
+        <div style="height:6px;background:#EDF0F7;border-radius:3px;margin-top:4px;"><div style="height:6px;width:${Math.max(1,Math.round(h.value/hs[0].value*100))}%;background:var(--purple);border-radius:3px;"></div></div>
+      </div><div style="text-align:right;margin-left:12px;"><div class="amt">${yen(h.value)}</div><div class="dt">${pct}%</div></div></div>`;
+  });
+  openModal(html);
+}
+function showDivBreakdown(){
+  const hs = (window.__holdings||[]).filter(h=>h.divTotal>0).sort((a,b)=>b.divTotal-a.divTotal);
+  if(!hs.length){openModal('<h3>年間配当</h3><div class="sub">データなし</div>');return;}
+  const total = hs.reduce((s,h)=>s+h.divTotal,0);
+  const totalNet = hs.reduce((s,h)=>s+h.divNet,0);
+  let html = `<h3>年間配当の内訳（税引前）</h3><div class="sub">${hs.length}銘柄・合計 ${yen(total)}（手取り目安 ${yen(totalNet)}）。銘柄クリックで詳細</div>`;
+  hs.forEach(h=>{
+    const yld = h.value ? (h.divTotal/h.value*100).toFixed(2) : null;
+    html += `<div class="mrow clickable" onclick="showStock('${(h.name+'|'+h.acct).replace(/'/g,"\\'")}')">
+      <div style="flex:1;"><span class="nm">${h.name}</span><div class="dt">${h.acct}${yld?'・利回り'+yld+'%':''}${h.acct.includes('NISA')?'・非課税':''}</div>
+        <div style="height:6px;background:#EDF0F7;border-radius:3px;margin-top:4px;"><div style="height:6px;width:${Math.max(1,Math.round(h.divTotal/hs[0].divTotal*100))}%;background:var(--green);border-radius:3px;"></div></div>
+      </div><div style="text-align:right;margin-left:12px;"><div class="amt" style="color:var(--green)">${yen(h.divTotal)}</div><div class="dt">手取り ${yen(h.divNet)}</div></div></div>`;
+  });
+  openModal(html);
+}
+
+/* ===== レイク返済計画 ===== */
+function showLakePlan(){
+  const rows = window.__loanRows;
+  let cur=null, end='';
+  if(rows){for(const r of rows){if((r[0]||'').includes('レイク')&&!String(r[0]).includes('スケジュール')){cur=num(r[2]);end=r[5]||'';break;}}}
+  let html = `<h3>レイク返済計画</h3><div class="sub">現在残高 ${cur!==null?yen(cur):'—'}・完済予定 ${end||'2027-03'}</div>`;
+  const sched=[];
+  if(rows){
+    for(const r of rows){
+      const dstr = String(r[0]||'');
+      const isDate = /^\d{4}-\d{2}-\d{2}/.test(dstr);
+      const isFinal = /最終返済/.test(dstr);
+      if(!isDate && !isFinal) continue;
+      const bal = num(r[3]); if(bal===null) continue;
+      sched.push({label: isFinal ? '2027-03-21（最終回）' : dstr.slice(0,10), fixed:num(r[1])||0, extra:num(r[2])||0, bal, final:isFinal});
+    }
+  }
+  if(sched.length){
+    const today = new Date().toISOString().slice(0,10);
+    html += `<table class="t" style="margin-top:10px;"><thead><tr><th>返済日</th><th style="text-align:right;">毎月固定</th><th style="text-align:right;">まとめ返済</th><th style="text-align:right;">返済後残高</th></tr></thead><tbody>`;
+    sched.forEach(s=>{
+      const done = s.label.slice(0,10) <= today;
+      const isNext = !done && sched.find(x=>x.label.slice(0,10)>today)===s;
+      html += `<tr style="${done?'opacity:0.5;':''}${isNext?'background:#FFF8E6;':''}">
+        <td>${done?'✅ ':''}${isNext?'👉 ':''}${s.label}</td>
+        <td class="num">${s.fixed?yen(s.fixed):''}</td>
+        <td class="num" style="color:var(--red);font-weight:${s.extra?'800':'400'};">${s.extra?yen(s.extra):''}</td>
+        <td class="num" style="font-weight:700;">${yen(s.bal)}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    const future = sched.filter(x=>x.label.slice(0,10) > today);
+    const totalLeft = future.reduce((s,x)=>s+x.fixed+x.extra,0);
+    html += `<div class="alert" style="margin-top:10px;">完済まで残り<b>${future.length}回・総額${yen(totalLeft)}</b>。毎月6日に21,000円引落＋<b>12月〜3月は10万円ずつのまとめ返済</b>で2027年3月21日完済予定。</div>`;
+  } else {
+    html += '<div class="sub">返済スケジュールのデータが負債シートにありません。</div>';
+  }
+  openModal(html);
+}
+
+/* ===== 口座内訳の前月比較 ===== */
+function showBankCompare(){
+  const snaps = window.__snaps||[];
+  if(snaps.length<1){openModal('<h3>口座別の推移</h3><div class="sub">データなし</div>');return;}
+  const latest = snaps[snaps.length-1], prev = snaps[snaps.length-2];
+  const defs = [
+    ['💵 現金・預金 合計', s=>s.cash+s.em],
+    ['　├ りそな銀行', s=>s.risona], ['　└ 城北信用金庫', s=>s.johoku],
+    ['📈 楽天証券', s=>s.rk], ['📈 SMBC日興', s=>s.nikko], ['📈 SBI証券', s=>s.sbi],
+    ['　（楽天・投信分）', s=>s.rkFund], ['　（SBI・投信分）', s=>s.sbiFund],
+    ['🧮 資産合計', s=>s.asset], ['💰 純資産', s=>s.net]
+  ];
+  let html = `<h3>口座別 前月比較</h3><div class="sub">${prev?prev.dt.y+'/'+prev.dt.m+' → ':''}${latest.dt.y}/${latest.dt.m}${prev?'':'（まだ1ヶ月分。来月の棚卸しで比較が始まります）'}</div>`;
+  html += `<table class="t" style="margin-top:10px;"><thead><tr><th>口座</th>${prev?`<th style="text-align:right;">${prev.dt.m}月</th>`:''}<th style="text-align:right;">${latest.dt.m}月</th>${prev?'<th style="text-align:right;">増減</th>':''}</tr></thead><tbody>`;
+  defs.forEach(([lb,fn])=>{
+    const v = fn(latest); if(v===null||v===undefined) return;
+    const pv = prev ? fn(prev) : null;
+    const d = (pv!==null&&pv!==undefined) ? v-pv : null;
+    html += `<tr><td style="font-size:12px;">${lb}</td>${prev?`<td class="num" style="opacity:0.6;">${pv!==null&&pv!==undefined?yen(pv):'—'}</td>`:''}<td class="num" style="font-weight:700;">${yen(v)}</td>${prev?`<td class="num" style="color:${d===null?'#8A93A6':d>=0?'var(--green)':'var(--red)'};font-weight:700;">${d!==null?signed(d):'—'}</td>`:''}</tr>`;
+  });
+  html += '</tbody></table>';
+  if(snaps.length>2) html += `<div class="note">全${snaps.length}ヶ月分の推移は「資産の内訳推移」グラフでも確認できます。</div>`;
   openModal(html);
 }
 
@@ -1160,6 +1287,7 @@ function showCfMonth(mIdx){
     }
     return `<div class="mrow"><div class="nm">${r.item}</div><div class="amt" style="color:var(--expense)">${yen(r.amt)}</div></div>`;
   }).join('');
+  html += monthNav('showCfMonth(__M__-1)', m);
   openModal(html);
 }
 function cardKey(name){
@@ -1323,6 +1451,7 @@ function showMonth(mIdx){
   if(c.div.length){
     html += [...c.div].sort((a,b)=>b.amt-a.amt).map(x=>`<div class="mrow"><div><span class="nm">${x.name}</span> <span class="catchip" style="font-size:9px;">${x.acct||''}</span></div><div class="amt">${yen(x.amt)}<span style="font-size:10px;color:var(--dim)"> 手取${yen(x.net)}</span></div></div>`).join('');
   } else html += '<div class="sub">なし</div>';
+  html += monthNav('showMonth(__M__-1)', mIdx+1);
   openModal(html);
 }
 
