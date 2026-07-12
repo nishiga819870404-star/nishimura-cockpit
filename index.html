@@ -87,8 +87,7 @@ nav .navitem.active{background:#E9ECFB;color:var(--header);}
 main{flex:1;padding:22px;max-width:1200px;}
 @media(max-width:760px){
   .layout{flex-direction:column;}
-  /* タブバーをスクロールしても上に固定（スマホ） */
-  nav{width:100%;display:flex;overflow-x:auto;padding:8px;border-right:none;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:60;box-shadow:0 4px 14px rgba(30,40,90,0.07);-webkit-overflow-scrolling:touch;}
+  nav{width:100%;display:flex;overflow-x:auto;padding:8px;border-right:none;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch;}
   nav .navitem{white-space:nowrap;margin-bottom:0;margin-right:4px;padding:9px 12px;}
   main{padding:14px;}
   /* 金額が箱からはみ出ないよう画面幅に応じて縮小 */
@@ -871,12 +870,25 @@ async function boot(){
     $('errbox').innerHTML='<div class="err">描画エラー: '+(e.message||e)+'<br>この画面のスクショをClaudeに送ってください。<br><span style="font-size:10px;">'+(e.stack||'').split('\n').slice(0,3).join('<br>')+'</span></div>';
   }
   $('app').classList.remove('hidden');
+  requestAnimationFrame(fitNums);
 }
+/* 金額が箱からはみ出す場合、収まるまでフォントを縮める（機種を問わず絶対に切れない保険） */
+function fitNums(){
+  document.querySelectorAll('.fbox .val, .kpi .val').forEach(el=>{
+    el.style.fontSize='';
+    let fs = parseFloat(getComputedStyle(el).fontSize), guard=0;
+    while(el.scrollWidth > el.clientWidth && fs > 11 && guard++ < 20){
+      fs -= 0.5; el.style.fontSize = fs + 'px';
+    }
+  });
+}
+window.addEventListener('resize', ()=>{ clearTimeout(window.__fitT); window.__fitT = setTimeout(fitNums, 150); });
 
 function divMode(){ try{return localStorage.getItem('divMode')||'gross';}catch(e){return 'gross';} }
 function setDivMode(m){
   try{localStorage.setItem('divMode',m);}catch(e){}
   if(window.__lastData) render(window.__lastData);
+  requestAnimationFrame(fitNums);
 }
 function render(d){
   window.__lastData = d;
