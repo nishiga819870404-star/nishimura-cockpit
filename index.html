@@ -697,20 +697,21 @@ const signed = n => (n<0?'−':'+') + '¥' + Math.abs(Math.round(n)).toLocaleStr
 
 /* ---- config in hash ---- */
 function readCfg(){
-  /* v9: #ハッシュ → localStorage の順で読む。どちらかにあれば両方へ同期（毎回の再入力を撲滅） */
-  try{
-    const h=location.hash.slice(1);
-    if(h){ const c=JSON.parse(decodeURIComponent(atob(h)));
-      try{localStorage.setItem('kakeiboCfg',JSON.stringify(c));}catch(e){}
-      return c; }
-  }catch(e){}
-  try{
-    const sv=localStorage.getItem('kakeiboCfg');
-    if(sv){ const c=JSON.parse(sv);
-      try{location.hash=btoa(encodeURIComponent(JSON.stringify(c)));}catch(e){}
-      return c; }
-  }catch(e){}
-  return null;
+  /* v10: #ハッシュとlocalStorageをマージ。古いブックマーク（項目が少ない旧ハッシュ）で開いても、
+     保存済みの新しい項目（食事ログ等）を消さない。ハッシュ側に値がある項目だけ上書き */
+  let hashC=null, savedC=null;
+  try{ const h=location.hash.slice(1); if(h) hashC=JSON.parse(decodeURIComponent(atob(h))); }catch(e){}
+  try{ const sv=localStorage.getItem('kakeiboCfg'); if(sv) savedC=JSON.parse(sv); }catch(e){}
+  let c=null;
+  if(hashC && savedC){
+    c={...savedC};
+    for(const k in hashC){ if(hashC[k]) c[k]=hashC[k]; }
+  } else c = hashC || savedC;
+  if(c){
+    try{localStorage.setItem('kakeiboCfg',JSON.stringify(c));}catch(e){}
+    try{location.hash=btoa(encodeURIComponent(JSON.stringify(c)));}catch(e){}
+  }
+  return c;
 }
 function writeCfg(c){
   try{localStorage.setItem('kakeiboCfg',JSON.stringify(c));}catch(e){}
