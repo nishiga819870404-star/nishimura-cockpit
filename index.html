@@ -890,6 +890,14 @@ function render(d){
   $('cf-exp').textContent=yen(expSum);
   $('cf-net').textContent=signed(incSum-expSum);
 
+  /* 資産サマリー: 今年の収支累計（実質）— レイク借入・臨時収入を除いた稼ぎベース */
+  const realInc = (window.__cfIncome||[]).filter(r=>r.y===thisYearNum && !/レイク|臨時/.test(String(r.item))).reduce((s,r)=>s+r.amt,0);
+  const allExpY = (window.__cfRows||[]).filter(r=>r.y===thisYearNum).reduce((s,r)=>s+r.amt,0);
+  const realNet = realInc - allExpY;
+  $('k-cf').textContent = signed(realNet);
+  $('k-cf').style.color = realNet>=0 ? 'var(--green)' : 'var(--red)';
+  $('k-cf-sub').textContent = thisYearNum+'年の実質(給与・賞与・経費戻り−支出)。レイク借入・臨時収入は除外';
+
   // 積み上げ棒: 費目(大分類)×月。__cfRowsが未定義でもここまでに作られている
   const bigOrder=['住まい','食費・日用','貯蓄・投資','ローン返済','健康・美容','通信','サブスク','交通','趣味・娯楽','その他'];
   const stackData = {};
@@ -1292,11 +1300,14 @@ function showIncomeChart(item,py,pm){
   /* 給与/賞与明細（収入明細CSV）があればその月の内訳を出す */
   let slip='';
   const pd=window.__paydetail||[];
-  if(pd.length){
-    const type = /賞与/.test(item)?'賞与':'給与';
-    let ym = (py&&pm)? py+'-'+String(pm).padStart(2,'0') : null;
-    let mine = ym? pd.filter(r=>r.ym===ym&&r.type===type) : [];
-    if(!mine.length){ const yms=[...new Set(pd.filter(r=>r.type===type).map(r=>r.ym))].sort(); if(yms.length){ym=yms[yms.length-1]; mine=pd.filter(r=>r.ym===ym&&r.type===type);} }
+  /* 明細を出すのは「給与系(収入/給料/給与)」と「賞与」の行だけ。レイク借入・臨時収入・経費関連は推移グラフのみ */
+  const type = /賞与/.test(String(item)) ? '賞与' : (/^(収入|給料|給与)/.test(String(item)) ? '給与' : null);
+  if(pd.length && type){
+    const ym = (py&&pm)? py+'-'+String(pm).padStart(2,'0') : null;
+    const mine = ym? pd.filter(r=>r.ym===ym&&r.type===type) : [];
+    if(!mine.length){
+      slip = `<div class="sub" style="margin:8px 0;">📄 ${ym||''}の${type}明細は未取込（明細スクショを「取り込んで」に投げると出ます）</div>`;
+    }
     if(mine.length){
       const sect=(kb,color)=>{
         const xs=mine.filter(r=>r.kubun===kb); if(!xs.length)return '';
