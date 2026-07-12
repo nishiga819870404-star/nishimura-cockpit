@@ -534,7 +534,7 @@ canvas{max-width:100%;}
 
         <h3>🔐 アクセスの大原則（絶対ルール）</h3>
         <ul>
-          <li>このOSの作業は<b>Coworkの finance-skills フォルダ経由</b>で行う。普通のチャットからは資産データは見えない（仕様）</li>
+          <li><b>質問も取込も全部Cowork（finance-skillsフォルダを接続したセッション）で。</b>claude.aiのプロジェクト「西村家ファイナンス」は使わない（2026-07-12決定：プロジェクトはスプシと同期できず古い答えを返すため）。スマホからもClaudeアプリでCoworkセッションを開けばOK</li>
           <li>理由：個人財務データは<b>個人Googleアカウント（nishiga8）に一本化</b>。仕事＝会社アカウント／プライベートの金＝個人アカウントの完全分離</li>
           <li>公開CSVのURLとこのページのURLは人に渡さない（パスワードと同じ扱い）</li>
         </ul>
@@ -564,7 +564,7 @@ canvas{max-width:100%;}
         </tbody></table>
 
         <h3>💬 チャット質問だけでできること（手作業不要・その場で回答）</h3>
-        <p>DBを読むだけの質問は、🟣Claudeプロジェクト「西村家ファイナンス」に聞けばその場で返ってきます：「今の含み益は？」「今月の権利確定はどれ？」「配当いくら入る予定？」「この株いくらで買った？」「QUOカード銘柄は？」「先月の電気代は？」「レイクの残高と完済予定は？」など。</p>
+        <p>DBを読むだけの質問は、<b>Cowork</b>に聞けばその場で返ってきます：「今の含み益は？」「今月の権利確定はどれ？」「配当いくら入る予定？」「この株いくらで買った？」「QUOカード銘柄は？」「先月の電気代は？」「レイクの残高と完済予定は？」など。</p>
         <p class="note">境界の目安：<b>読む・答える＝チャットでOK／取り込む・更新する（スクショ→データ化・スプシ反映）＝Cowork（finance-skills）が必要。</b></p>
 
         <h3>🗣️ 頼み方の例（コピペOK）</h3>
@@ -1264,6 +1264,7 @@ function showStock(key){
   const divPerTime = divCount>0 ? Math.round(h.divTotal/divCount) : 0;
   let divFreq = divCount===0 ? '配当なし/不明' : (divCount===1?'年1回':(divCount===2?'年2回':'年'+divCount+'回'));
   html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">💴 配当の基本情報</h4>
+    <div class="mrow"><div><span class="nm">1株あたり年間配当</span><div class="dt">DBの配当予想値。毎月の照合で増配・減配があれば更新</div></div><div class="amt">${h.divTotal&&h.shares?'¥'+(h.divTotal/h.shares).toLocaleString(undefined,{maximumFractionDigits:1})+' /株':'−'}</div></div>
     <div class="mrow"><div class="nm">年間配当（額面）</div><div class="amt">${h.divTotal?yen(h.divTotal):'−'}</div></div>
     <div class="mrow"><div class="nm">手取り目安</div><div class="amt">${h.divNet?yen(h.divNet):'−'}<span style="font-size:10px;color:var(--dim)"> (${h.acct.includes('NISA')?'非課税':'20.315%控除'})</span></div></div>
     <div class="mrow"><div><span class="nm">支払回数</span><div class="dt">${divFreq}${divCount>0?' ／ 1回あたり約'+yen(divPerTime):''}</div></div><div style="font-size:12px;color:var(--dim);">${h.rights||'権利月不明'}</div></div>
