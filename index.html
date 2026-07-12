@@ -87,9 +87,14 @@ nav .navitem.active{background:#E9ECFB;color:var(--header);}
 main{flex:1;padding:22px;max-width:1200px;}
 @media(max-width:760px){
   .layout{flex-direction:column;}
-  nav{width:100%;display:flex;overflow-x:auto;padding:8px;border-right:none;border-bottom:1px solid var(--line);}
+  /* タブバーをスクロールしても上に固定（スマホ） */
+  nav{width:100%;display:flex;overflow-x:auto;padding:8px;border-right:none;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:60;box-shadow:0 4px 14px rgba(30,40,90,0.07);-webkit-overflow-scrolling:touch;}
   nav .navitem{white-space:nowrap;margin-bottom:0;margin-right:4px;padding:9px 12px;}
   main{padding:14px;}
+  /* 金額が箱からはみ出ないよう画面幅に応じて縮小 */
+  .fbox .val{font-size:clamp(15px,5.4vw,22px);}
+  .fop{font-size:20px;}
+  .kpi .val{font-size:clamp(15px,5.2vw,20px);}
 }
 
 /* ===== cards & KPI ===== */
