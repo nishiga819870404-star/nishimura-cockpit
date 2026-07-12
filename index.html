@@ -480,10 +480,10 @@ canvas{max-width:100%;}
           <div class="val" id="h-weight">—</div>
           <div class="sub" id="h-weight-sub">体重を送ると記録されます</div>
         </div>
-        <div class="kpi" style="--accent:var(--green)">
+        <div class="kpi clickable" style="--accent:var(--green)" onclick="if(window.__todayKey&&(window.__mealByDay||{})[window.__todayKey])showMealDay(window.__todayKey)">
           <div class="lb">今日の摂取カロリー</div>
           <div class="val" id="h-kcal">—</div>
-          <div class="sub" id="h-kcal-sub">食事写真を投げるだけ</div>
+          <div class="sub" id="h-kcal-sub">食事写真を投げるだけ・クリックで今日の明細</div>
         </div>
         <div class="kpi" style="--accent:var(--amber)">
           <div class="lb">今日のPFC</div>
@@ -511,8 +511,8 @@ canvas{max-width:100%;}
       </div>
 
       <div class="card">
-        <h2>食事ログ <span class="tag">直近の記録・日をクリックで明細</span></h2>
-        <div id="mealList"><div class="note">食事の写真をCoworkに投げると自動でここに貯まります。栄養成分表示が写っていると精度アップ。表示されない場合は、スプシの公開設定に「食事ログ」「体重ログ」シートが含まれているか確認（ファイル→共有→ウェブに公開）。</div></div>
+        <h2>食事カレンダー <span class="tag">日をクリックで明細（朝昼夕・間食ごと）</span></h2>
+        <div id="mealCal"><div class="note">食事の写真をCoworkに投げると自動でここに貯まります。栄養成分表示が写っていると精度アップ。表示されない場合は、スプシの公開設定に「食事ログ」「体重ログ」シートが含まれているか確認（ファイル→共有→ウェブに公開）。</div></div>
       </div>
     </section>
 
@@ -1289,18 +1289,51 @@ function renderHealth(meal, weight, now){
       scales:{x:{ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
         y:{ticks:{color:'#8A93A6',font:{size:10}},grid:{color:'#EDF0F7'}}}}});
   }
-  /* 直近の食事リスト（新しい日から7日分） */
-  if(dayKeys.length){
-    const KIND_ICO = {'朝食':'🌅','昼食':'🌞','夕食':'🌙','間食':'🍪'};
-    $('mealList').innerHTML = dayKeys.slice(-7).reverse().map(k=>{
-      const d = byDay[k];
-      const w = ws.find(x=>x.dk===k);
-      return `<div class="mrow clickable" onclick="showMealDay('${k}')">
-        <div style="flex:1;"><span class="nm">${k}${k===todayKey?' <span class="tag">今日</span>':''}</span>
-          <div class="dt">${d.items.slice(0,4).map(m=>(KIND_ICO[m.kind]||'🍽')+m.item).join('、')}${d.items.length>4?' 他'+(d.items.length-4)+'件':''}${w?'・⚖️'+w.kg.toFixed(1)+'kg':''}</div>
-        </div><div style="text-align:right;margin-left:12px;"><div class="amt">${Math.round(d.kcal).toLocaleString()} kcal</div><div class="dt">P${Math.round(d.p)}/F${Math.round(d.f)}/C${Math.round(d.c)}</div></div></div>`;
-    }).join('');
+  /* 食事カレンダー（月めくり式） */
+  window.__mealByDay = byDay; window.__todayKey = todayKey;
+  if($('mealCal')) renderMealCal(now.getFullYear(), now.getMonth()+1);
+}
+function renderMealCal(y, m){
+  window.__healthYM = {y, m};
+  const byDay = window.__mealByDay || {};
+  const ws = window.__weights || [];
+  const todayKey = window.__todayKey || '';
+  const dim = new Date(y, m, 0).getDate();          /* この月の日数 */
+  const startDow = new Date(y, m-1, 1).getDay();     /* 1日の曜日(0=日) */
+  const py = m===1? y-1 : y, pm = m===1? 12 : m-1;   /* 前月（年またぎOK） */
+  const ny = m===12? y+1 : y, nm = m===12? 1 : m+1;  /* 翌月（年またぎOK） */
+  const btn = 'border:1px solid var(--line);background:#F5F7FD;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;';
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <button onclick="renderMealCal(${py},${pm})" style="${btn}">← ${pm}月</button>
+    <div style="font-weight:900;font-size:14.5px;">${y}年${m}月</div>
+    <button onclick="renderMealCal(${ny},${nm})" style="${btn}">${nm}月 →</button></div>`;
+  html += `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">`;
+  const DOW = ['日','月','火','水','木','金','土'];
+  html += DOW.map((d,i)=>`<div style="text-align:center;font-size:10px;font-weight:700;color:${i===0?'#D96C5F':i===6?'#5B8DEF':'#8A93A6'};padding:2px 0;">${d}</div>`).join('');
+  for(let i=0;i<startDow;i++) html += '<div></div>';
+  let sd=0, sk=0, sp=0, sf=0, sc=0;
+  for(let d=1; d<=dim; d++){
+    const dk = y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const dd = byDay[dk]; const w = ws.find(x=>x.dk===dk);
+    let bg='#F7F8FC', col='#C6CBD8', body='ー';
+    if(dd){
+      sd++; sk+=dd.kcal; sp+=dd.p; sf+=dd.f; sc+=dd.c;
+      const k = Math.round(dd.kcal);
+      if(k<=1800){ bg='#E7F7F0'; col='#1E9E77'; }
+      else if(k<=2300){ bg='#FDF3E3'; col='#C08A2D'; }
+      else { bg='#FDE9E7'; col='#D96C5F'; }
+      body = k.toLocaleString();
+    }
+    html += `<div ${dd?`class="clickable" onclick="showMealDay('${dk}')"`:''} style="background:${bg};border-radius:8px;padding:3px 3px 4px;min-height:48px;text-align:center;${dk===todayKey?'outline:2px solid #8E7CE0;':''}${dd?'cursor:pointer;':''}">
+      <div style="font-size:9.5px;font-weight:700;color:#8A93A6;text-align:left;padding-left:3px;">${d}</div>
+      <div style="font-size:11.5px;font-weight:900;color:${col};line-height:1.3;">${body}</div>
+      ${w?`<div style="font-size:9px;color:#8A93A6;">⚖${w.kg.toFixed(1)}</div>`:''}
+    </div>`;
   }
+  html += '</div>';
+  if(sd) html += `<div class="note" style="margin-top:8px;">この月: 記録${sd}日・平均 <b>${Math.round(sk/sd).toLocaleString()}kcal/日</b>・平均P${Math.round(sp/sd)} / F${Math.round(sf/sd)} / C${Math.round(sc/sd)}g　｜　色の目安: 🟢1,800以下 🟡2,300以下 🔴それ超（基準は「目標◯◯kcalにして」で調整可）</div>`;
+  else html += `<div class="note" style="margin-top:8px;">${y}年${m}月の記録はまだありません。食事写真をCoworkに投げると自動でここに貯まります。</div>`;
+  $('mealCal').innerHTML = html;
 }
 function showMealDay(dk){
   const KIND_ICO = {'朝食':'🌅','昼食':'🌞','夕食':'🌙','間食':'🍪'};
@@ -1370,6 +1403,7 @@ function showPortBreakdown(){
         <div style="height:6px;background:#EDF0F7;border-radius:3px;margin-top:4px;"><div style="height:6px;width:${Math.max(1,Math.round(h.value/hs[0].value*100))}%;background:var(--purple);border-radius:3px;"></div></div>
       </div><div style="text-align:right;margin-left:12px;"><div class="amt">${yen(h.value)}</div><div class="dt">${pct}%</div></div></div>`;
   });
+  window.__stockCtx = {keys: hs.map(h=>h.name+'|'+h.acct), cur:null, back: showPortBreakdown};
   openModal(html);
 }
 function showDivBreakdown(){
@@ -1388,6 +1422,7 @@ function showDivBreakdown(){
         <div style="height:6px;background:#EDF0F7;border-radius:3px;margin-top:4px;"><div style="height:6px;width:${Math.max(1,Math.round(pick(h)/pick(hs[0])*100))}%;background:var(--green);border-radius:3px;"></div></div>
       </div><div style="text-align:right;margin-left:12px;"><div class="amt" style="color:var(--green)">${yen(pick(h))}</div><div class="dt">${dNet?(isNisa?'非課税（額面と同額）':'税引前 '+yen(h.divTotal)):'手取り '+yen(h.divNet)}</div></div></div>`;
   });
+  window.__stockCtx = {keys: hs.map(h=>h.name+'|'+h.acct), cur:null, back: showDivBreakdown};
   openModal(html);
 }
 
@@ -1606,7 +1641,29 @@ function showStock(key){
     if(yh.length>8) html += `<div class="sub">他 ${yh.length-8}回（取得日 ${parseAcqDate(h.memo).y}年${parseAcqDate(h.memo).m}月〜）</div>`;
     html += `<div class="sub" style="margin-top:4px;">※権利確定情報からの推定です。実際の到着記録を付けたい場合は月次サイクルで「◯◯の優待届いた」と申告すればログ化できます。</div>`;
   }
+  /* 一覧から開かれた場合: 前後の銘柄ナビ＋一覧へ戻る */
+  const nav = window.__stockCtx;
+  if(nav && nav.keys && nav.keys.indexOf(key)>=0){
+    nav.cur = key;
+    const i = nav.keys.indexOf(key), n = nav.keys.length;
+    const bs = 'border:1px solid var(--line);background:#F5F7FD;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;';
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:16px;border-top:1px solid var(--line);padding-top:10px;">
+      <button onclick="stockNavGo(-1)" style="${bs}${i===0?'opacity:.3;pointer-events:none;':''}">← 前の銘柄</button>
+      <button onclick="stockNavBack()" style="${bs}">📋 一覧へ戻る <span style="color:var(--dim);font-weight:600;">${i+1}/${n}</span></button>
+      <button onclick="stockNavGo(1)" style="${bs}${i===n-1?'opacity:.3;pointer-events:none;':''}">次の銘柄 →</button>
+    </div>`;
+  }
   openModal(html);
+}
+function stockNavGo(d){
+  const c = window.__stockCtx; if(!c || !c.cur) return;
+  const i = c.keys.indexOf(c.cur) + d;
+  if(i < 0 || i >= c.keys.length) return;
+  showStock(c.keys[i]);
+}
+function stockNavBack(){
+  const c = window.__stockCtx;
+  if(c && typeof c.back === 'function') c.back(); else closeModal();
 }
 
 function showMonth(mIdx){
@@ -1640,6 +1697,7 @@ function showMonth(mIdx){
     html += [...c.div].sort((a,b)=>b.amt-a.amt).map(x=>`<div class="mrow"><div><span class="nm">${x.name}</span> <span class="catchip" style="font-size:9px;">${x.acct||''}</span></div><div class="amt">${yen(x.amt)}<span style="font-size:10px;color:var(--dim)"> 手取${yen(x.net)}</span></div></div>`).join('');
   } else html += '<div class="sub">なし</div>';
   html += monthNav('showMonth(__M__-1)', mIdx+1);
+  window.__stockCtx = {keys: c.yutai.map(x=>x.h.name+'|'+x.h.acct), cur:null, back: ()=>showMonth(mIdx)};
   openModal(html);
 }
 
