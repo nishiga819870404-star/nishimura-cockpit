@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>西村家 資産ダッシュボード</title>
+<title>西村OS — 資産も健康も、ぜんぶここに</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
@@ -235,8 +235,8 @@ canvas{max-width:100%;}
 
 <div class="topbar">
   <div class="brand">
-    <div class="logo">¥</div>
-    <h1><small>NISHIMURA FAMILY OFFICE</small>西村家 資産ダッシュボード</h1>
+    <div class="logo">🐧</div>
+    <h1><small>NISHIMURA OS — 資産管理も食事管理も、西村の生活まるごとサポート</small>西村OS</h1>
   </div>
   <div class="actions">
     <span class="stamp" id="stamp">未読込</span>
@@ -272,7 +272,13 @@ canvas{max-width:100%;}
     <input id="u-watch">
     <label>欲しいものリスト CSV URL（任意）</label>
     <input id="u-wish">
-    <button class="go" id="go">ダッシュボード起動 →</button>
+    <label>食事ログ CSV URL（任意・健康タブ用）</label>
+    <input id="u-meal">
+    <label>体重ログ CSV URL（任意・健康タブ用）</label>
+    <input id="u-weight">
+    <label>株価履歴 CSV URL（任意・前日比表示用/将来機能）</label>
+    <input id="u-kabuhist">
+    <button class="go" id="go">西村OS 起動 →</button>
     <p class="note" style="margin-top:14px;">設定はこの端末（ブラウザ）に自動保存されます。<b>入力は初回の1回だけ</b>で、次回からはそのまま起動します。<br>別の端末で使うときは、起動後の「#」付きURLを送ってブックマークすれば設定ごと引き継げます。<br>※公開CSVのURLと#付きURLは第三者に渡さないこと。ブラウザの閲覧データを全消去すると設定も消えるので、#付きURLのブックマークを保険に。</p>
   </div>
 </div>
@@ -284,6 +290,7 @@ canvas{max-width:100%;}
     <div class="navitem" data-page="p-cf"><span class="ico">💰</span>収支推移</div>
     <div class="navitem" data-page="p-detail"><span class="ico">🧾</span>費目別詳細</div>
     <div class="navitem" data-page="p-yutai"><span class="ico">🎁</span>優待・配当</div>
+    <div class="navitem" data-page="p-health"><span class="ico">🏃</span>健康</div>
     <div class="navitem" data-page="p-report"><span class="ico">📝</span>月次レポート</div>
     <div class="navitem" data-page="p-manual"><span class="ico">📖</span>使い方</div>
   </nav>
@@ -465,6 +472,50 @@ canvas{max-width:100%;}
 
     </section>
 
+    <!-- ===== page: health（🏃 ダイエット・健康ログ） ===== -->
+    <section id="p-health" class="hidden">
+      <div class="kpis">
+        <div class="kpi" style="--accent:var(--purple)">
+          <div class="lb">現在の体重</div>
+          <div class="val" id="h-weight">—</div>
+          <div class="sub" id="h-weight-sub">体重を送ると記録されます</div>
+        </div>
+        <div class="kpi" style="--accent:var(--green)">
+          <div class="lb">今日の摂取カロリー</div>
+          <div class="val" id="h-kcal">—</div>
+          <div class="sub" id="h-kcal-sub">食事写真を投げるだけ</div>
+        </div>
+        <div class="kpi" style="--accent:var(--amber)">
+          <div class="lb">今日のPFC</div>
+          <div class="val" id="h-pfc" style="font-size:17px;">—</div>
+          <div class="sub">たんぱく質 / 脂質 / 炭水化物</div>
+        </div>
+        <div class="kpi" style="--accent:var(--income)">
+          <div class="lb">記録日数</div>
+          <div class="val" id="h-days">—</div>
+          <div class="sub" id="h-days-sub">続けるほど見えてくる</div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h2>体重の推移 <span class="tag">週平均で見る（1日の上下に一喜一憂しない）</span></h2>
+          <canvas id="weightChart" height="230"></canvas>
+          <div class="note" id="weightNote">「今朝◯◯.◯kg」と送るか体重計の写真で記録。毎朝same時間帯の測定が理想。</div>
+        </div>
+        <div class="card">
+          <h2>日別カロリー <span class="tag">直近14日</span></h2>
+          <canvas id="kcalChart" height="230"></canvas>
+          <div class="note">推定値（±2〜3割）。正確さより「傾向と継続」を見る。</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>食事ログ <span class="tag">直近の記録・日をクリックで明細</span></h2>
+        <div id="mealList"><div class="note">食事の写真をCoworkに投げると自動でここに貯まります。栄養成分表示が写っていると精度アップ。表示されない場合は、スプシの公開設定に「食事ログ」「体重ログ」シートが含まれているか確認（ファイル→共有→ウェブに公開）。</div></div>
+      </div>
+    </section>
+
     <!-- ===== page: report ===== -->
     <section id="p-report" class="hidden">
       <div class="card">
@@ -533,6 +584,7 @@ canvas{max-width:100%;}
           <li><b>収支推移</b>：青＝収入・ピンク＝支出・線＝手残り。<b>ヒートマップ</b>（色が濃い月ほど支出大）で季節性が見える</li>
           <li><b>費目別詳細</b>：ここに<b>収支カレンダー</b>。月をクリック→明細→<b>カードの行をさらにクリックすると購入明細（レシート）の内訳</b>まで掘れる</li>
           <li><b>優待・配当</b>：🎁＝月末に持っていれば権利確定する優待／💰＝配当支払の目安（権利月＋約3ヶ月）。✅長期条件クリア／⏳あと少し／❓取得日不明。銘柄クリックで取得単価・含み損益・配当受取実績</li>
+          <li><b>健康</b>（2026-07-13運用開始）：体重の推移（1日の上下ではなく7日平均の点線で見る）・日別カロリー・食事ログ。<b>食事の写真と「今朝◯◯kg」をCoworkに投げるだけ</b>で自動記録される。日をクリックで朝昼夜間食の明細</li>
           <li><b>月次レポート</b>：毎月のFPレポートが貯まる場所</li>
         </ul>
 
@@ -674,7 +726,7 @@ document.querySelectorAll('.navitem').forEach(el=>{
 let CFG = readCfg();
 if(CFG){ $('setup').classList.add('hidden'); boot(); }
 $('go').addEventListener('click',()=>{
-  const c={snap:$('u-snap').value.trim(),cf:$('u-cf').value.trim(),port:$('u-port').value.trim(),loan:$('u-loan').value.trim(),meisai:$('u-meisai').value.trim(),report:$('u-report').value.trim(),hist:$('u-hist').value.trim(),fixed:$('u-fixed').value.trim(),income:$('u-income').value.trim(),watch:$('u-watch').value.trim(),wish:$('u-wish').value.trim()};
+  const c={snap:$('u-snap').value.trim(),cf:$('u-cf').value.trim(),port:$('u-port').value.trim(),loan:$('u-loan').value.trim(),meisai:$('u-meisai').value.trim(),report:$('u-report').value.trim(),hist:$('u-hist').value.trim(),fixed:$('u-fixed').value.trim(),income:$('u-income').value.trim(),watch:$('u-watch').value.trim(),wish:$('u-wish').value.trim(),meal:$('u-meal').value.trim(),weight:$('u-weight').value.trim(),kabuhist:$('u-kabuhist').value.trim()};
   // v2互換: med設定は無視
   if(!c.snap||!c.cf||!c.port){alert('必須3つのURLを入れてください');return;}
   CFG=c;writeCfg(c);$('setup').classList.add('hidden');boot();
@@ -682,7 +734,7 @@ $('go').addEventListener('click',()=>{
 $('reload').addEventListener('click',()=>{if(CFG)boot();});
 $('reconfig').addEventListener('click',()=>{
   $('app').classList.add('hidden');$('setup').classList.remove('hidden');
-  if(CFG){$('u-snap').value=CFG.snap||'';$('u-cf').value=CFG.cf||'';$('u-port').value=CFG.port||'';$('u-loan').value=CFG.loan||'';$('u-meisai').value=CFG.meisai||'';$('u-report').value=CFG.report||'';$('u-hist').value=CFG.hist||'';$('u-fixed').value=CFG.fixed||'';$('u-income').value=CFG.income||'';$('u-watch').value=CFG.watch||'';$('u-wish').value=CFG.wish||'';}
+  if(CFG){$('u-snap').value=CFG.snap||'';$('u-cf').value=CFG.cf||'';$('u-port').value=CFG.port||'';$('u-loan').value=CFG.loan||'';$('u-meisai').value=CFG.meisai||'';$('u-report').value=CFG.report||'';$('u-hist').value=CFG.hist||'';$('u-fixed').value=CFG.fixed||'';$('u-income').value=CFG.income||'';$('u-watch').value=CFG.watch||'';$('u-wish').value=CFG.wish||'';$('u-meal').value=CFG.meal||'';$('u-weight').value=CFG.weight||'';$('u-kabuhist').value=CFG.kabuhist||'';}
 });
 
 /* ---- charts registry ---- */
@@ -775,13 +827,14 @@ async function boot(){
   $('errbox').innerHTML='';
   const errs=[];
   const get=async(u,l)=>{ if(!u)return null; try{return await fetchCSV(u);}catch(e){errs.push(l+': '+e.message);return null;} };
-  const [snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish]=await Promise.all([
-    get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート'),get(CFG.hist,'配当履歴'),get(CFG.fixed,'固定費'),get(CFG.income,'収入明細'),get(CFG.watch,'ウォッチリスト'),get(CFG.wish,'欲しいものリスト')
+  const getQuiet=async(u)=>{ if(!u)return null; try{return await fetchCSV(u);}catch(e){return null;} };
+  const [snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish,meal,weight]=await Promise.all([
+    get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート'),get(CFG.hist,'配当履歴'),get(CFG.fixed,'固定費'),get(CFG.income,'収入明細'),get(CFG.watch,'ウォッチリスト'),get(CFG.wish,'欲しいものリスト'),getQuiet(CFG.meal),getQuiet(CFG.weight)
   ]);
   if(errs.length) $('errbox').innerHTML='<div class="err">読み込みエラー: '+errs.join(' / ')+'<br>URLが「ウェブに公開」のCSV形式か確認してください。</div>';
   if(!snap||!cf||!port){$('app').classList.remove('hidden');return;}
   try{
-    render({snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish});
+    render({snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish,meal,weight});
     $('stamp').textContent='更新: '+new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   }catch(e){
     $('errbox').innerHTML='<div class="err">描画エラー: '+(e.message||e)+'<br>この画面のスクショをClaudeに送ってください。<br><span style="font-size:10px;">'+(e.stack||'').split('\n').slice(0,3).join('<br>')+'</span></div>';
@@ -1162,7 +1215,106 @@ function render(d){
   renderReports(d.report);
   renderWatch(d.watch);
   renderWish(d.wish);
+  renderHealth(d.meal, d.weight, now);
   $('alertbox').innerHTML=alerts.length?'<div class="alert">📋 '+alerts.join('<br>')+'</div>':'';
+}
+
+/* ===== 🏃 健康タブ（食事ログ・体重ログ） ===== */
+const pd = s=>{ const m=String(s).match(/(\d{4})[-\/年](\d{1,2})[-\/月](\d{1,2})/); return m?m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'):null; };
+function renderHealth(meal, weight, now){
+  now = now || new Date();
+  const todayKey = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+
+  /* --- 体重ログ: 日付/体重kg/体脂肪率%/メモ --- */
+  const ws=[];
+  if(weight && weight.length>1){
+    for(let i=1;i<weight.length;i++){
+      const r=weight[i]; const dk=pd(r[0]); const kg=num(r[1]);
+      if(!dk||kg===null) continue;
+      ws.push({dk, kg, fat:num(r[2]), memo:r[3]||''});
+    }
+  }
+  ws.sort((a,b)=>a.dk<b.dk?-1:1);
+  window.__weights = ws;
+  if(ws.length){
+    const last = ws[ws.length-1], prev = ws[ws.length-2];
+    $('h-weight').textContent = last.kg.toFixed(1)+' kg';
+    const week = ws.slice(-7);
+    const wavg = week.reduce((s,w)=>s+w.kg,0)/week.length;
+    $('h-weight-sub').innerHTML = (prev? '前回比 '+(last.kg-prev.kg>=0?'+':'−')+Math.abs(last.kg-prev.kg).toFixed(1)+'kg・':'') + '直近7回平均 '+wavg.toFixed(1)+'kg' + (last.fat? '・体脂肪 '+last.fat+'%':'');
+  }
+  /* --- 食事ログ: 日付/時刻/区分/内容/推定カロリー/P/F/C/根拠/メモ --- */
+  const ms=[];
+  if(meal && meal.length>1){
+    for(let i=1;i<meal.length;i++){
+      const r=meal[i]; const dk=pd(r[0]);
+      if(!dk||!r[3]) continue;
+      ms.push({dk, time:r[1]||'', kind:r[2]||'', item:r[3], kcal:num(r[4])||0, p:num(r[5])||0, f:num(r[6])||0, c:num(r[7])||0, basis:r[8]||'', memo:r[9]||''});
+    }
+  }
+  window.__meals = ms;
+  const byDay = {};
+  ms.forEach(m=>{ if(!byDay[m.dk])byDay[m.dk]={kcal:0,p:0,f:0,c:0,items:[]}; const d=byDay[m.dk]; d.kcal+=m.kcal; d.p+=m.p; d.f+=m.f; d.c+=m.c; d.items.push(m); });
+  const dayKeys = Object.keys(byDay).sort();
+
+  const today = byDay[todayKey];
+  if(today){
+    $('h-kcal').textContent = Math.round(today.kcal).toLocaleString()+' kcal';
+    $('h-kcal-sub').textContent = today.items.length+'件記録済み';
+    $('h-pfc').textContent = 'P'+Math.round(today.p)+' / F'+Math.round(today.f)+' / C'+Math.round(today.c)+' g';
+  }
+  const recDays = new Set([...dayKeys, ...ws.map(w=>w.dk)]).size;
+  if(recDays){ $('h-days').textContent = recDays+'日'; $('h-days-sub').textContent = (ws.length?'体重'+ws.length+'回・':'')+'食事'+ms.length+'件'; }
+
+  /* 体重チャート（実測＋7日移動平均） */
+  if(ws.length){
+    const mov = ws.map((w,i)=>{ const win=ws.slice(Math.max(0,i-6),i+1); return win.reduce((s,x)=>s+x.kg,0)/win.length; });
+    mkChart('weightChart',{type:'line',data:{
+      labels:ws.map(w=>w.dk.slice(5).replace('-','/')),
+      datasets:[
+        {label:'体重',data:ws.map(w=>w.kg),borderColor:'#8E7CE0',backgroundColor:'rgba(142,124,224,0.08)',fill:true,tension:0.25,pointRadius:3,borderWidth:2},
+        {label:'7日平均',data:mov,borderColor:'#2E3440',borderDash:[6,4],pointRadius:0,borderWidth:2,tension:0.3,fill:false}
+      ]},options:{plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:10.5},boxWidth:12}}},
+      scales:{x:{ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
+        y:{ticks:{color:'#8A93A6',font:{size:10},callback:v=>v+'kg'},grid:{color:'#EDF0F7'}}}}});
+  }
+  /* 日別カロリーチャート（直近14日） */
+  if(dayKeys.length){
+    const last14 = dayKeys.slice(-14);
+    mkChart('kcalChart',{type:'bar',data:{
+      labels:last14.map(k=>k.slice(5).replace('-','/')),
+      datasets:[{label:'kcal',data:last14.map(k=>Math.round(byDay[k].kcal)),backgroundColor:'#43C59E',borderRadius:5}]
+    },options:{plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
+        y:{ticks:{color:'#8A93A6',font:{size:10}},grid:{color:'#EDF0F7'}}}}});
+  }
+  /* 直近の食事リスト（新しい日から7日分） */
+  if(dayKeys.length){
+    const KIND_ICO = {'朝食':'🌅','昼食':'🌞','夕食':'🌙','間食':'🍪'};
+    $('mealList').innerHTML = dayKeys.slice(-7).reverse().map(k=>{
+      const d = byDay[k];
+      const w = ws.find(x=>x.dk===k);
+      return `<div class="mrow clickable" onclick="showMealDay('${k}')">
+        <div style="flex:1;"><span class="nm">${k}${k===todayKey?' <span class="tag">今日</span>':''}</span>
+          <div class="dt">${d.items.slice(0,4).map(m=>(KIND_ICO[m.kind]||'🍽')+m.item).join('、')}${d.items.length>4?' 他'+(d.items.length-4)+'件':''}${w?'・⚖️'+w.kg.toFixed(1)+'kg':''}</div>
+        </div><div style="text-align:right;margin-left:12px;"><div class="amt">${Math.round(d.kcal).toLocaleString()} kcal</div><div class="dt">P${Math.round(d.p)}/F${Math.round(d.f)}/C${Math.round(d.c)}</div></div></div>`;
+    }).join('');
+  }
+}
+function showMealDay(dk){
+  const KIND_ICO = {'朝食':'🌅','昼食':'🌞','夕食':'🌙','間食':'🍪'};
+  const items = (window.__meals||[]).filter(m=>m.dk===dk);
+  const w = (window.__weights||[]).find(x=>x.dk===dk);
+  const t = items.reduce((s,m)=>({kcal:s.kcal+m.kcal,p:s.p+m.p,f:s.f+m.f,c:s.c+m.c}),{kcal:0,p:0,f:0,c:0});
+  let html = `<h3>${dk} の食事</h3><div class="sub">合計 ${Math.round(t.kcal).toLocaleString()}kcal・P${Math.round(t.p)}g / F${Math.round(t.f)}g / C${Math.round(t.c)}g${w?'・体重 '+w.kg.toFixed(1)+'kg':''}</div>`;
+  const order = ['朝食','昼食','夕食','間食'];
+  order.concat(items.map(m=>m.kind).filter(k=>!order.includes(k))).filter((v,i,a)=>a.indexOf(v)===i).forEach(kind=>{
+    const ki = items.filter(m=>m.kind===kind);
+    if(!ki.length) return;
+    html += `<h4 style="font-size:13px;font-weight:900;margin:12px 0 4px;">${KIND_ICO[kind]||'🍽'} ${kind}</h4>`;
+    html += ki.map(m=>`<div class="mrow"><div><span class="nm">${m.item}</span><div class="dt">${m.time?m.time+'・':''}P${Math.round(m.p)}/F${Math.round(m.f)}/C${Math.round(m.c)}g・${m.basis||'概算'}${m.memo?'・'+m.memo:''}</div></div><div class="amt">${Math.round(m.kcal).toLocaleString()} kcal</div></div>`).join('');
+  });
+  openModal(html);
 }
 
 /* ===== v8 カテゴリ内訳 ===== */
