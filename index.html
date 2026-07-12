@@ -1647,7 +1647,8 @@ function showStock(key){
     nav.cur = key;
     const i = nav.keys.indexOf(key), n = nav.keys.length;
     const bs = 'border:1px solid var(--line);background:#F5F7FD;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;';
-    html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:16px;border-top:1px solid var(--line);padding-top:10px;">
+    /* sticky: スクロールしなくても常に下に見えるナビバー */
+    html += `<div style="position:sticky;bottom:-22px;background:#fff;display:flex;justify-content:space-between;align-items:center;gap:6px;margin:16px -22px -22px;padding:10px 22px 14px;border-top:1px solid var(--line);box-shadow:0 -10px 14px -10px rgba(30,40,90,0.18);">
       <button onclick="stockNavGo(-1)" style="${bs}${i===0?'opacity:.3;pointer-events:none;':''}">← 前の銘柄</button>
       <button onclick="stockNavBack()" style="${bs}">📋 一覧へ戻る <span style="color:var(--dim);font-weight:600;">${i+1}/${n}</span></button>
       <button onclick="stockNavGo(1)" style="${bs}${i===n-1?'opacity:.3;pointer-events:none;':''}">次の銘柄 →</button>
