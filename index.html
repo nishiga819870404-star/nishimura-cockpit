@@ -267,7 +267,7 @@ canvas{max-width:100%;}
     <label>固定費 CSV URL（任意・固定費一覧の表示用）</label>
     <input id="u-fixed">
     <button class="go" id="go">ダッシュボード起動 →</button>
-    <p class="note" style="margin-top:14px;">設定はURLの#以降に保存されます。起動後のURLをブックマーク／ホーム画面に追加してください。<br>※公開CSVのURLは第三者に渡さないこと。</p>
+    <p class="note" style="margin-top:14px;">設定はこの端末（ブラウザ）に自動保存されます。<b>入力は初回の1回だけ</b>で、次回からはそのまま起動します。<br>別の端末で使うときは、起動後の「#」付きURLを送ってブックマークすれば設定ごと引き継げます。<br>※公開CSVのURLと#付きURLは第三者に渡さないこと。ブラウザの閲覧データを全消去すると設定も消えるので、#付きURLのブックマークを保険に。</p>
   </div>
 </div>
 
@@ -562,6 +562,7 @@ canvas{max-width:100%;}
         <h3>⚠️ 数字がおかしい時</h3>
         <ul>
           <li>まず右上の「🔄 更新」。スプシ反映に数分かかることがあります</li>
+          <li>初期設定画面が出てしまったら→設定は端末に自動保存されています（2026-07-12改修）。出るのはブラウザデータを消したときだけなので、その場合は#付きブックマークから開くか再入力を</li>
           <li>含み損益が0円に見える銘柄→現在株価が未更新（取得単価のまま）。月末スクショの取込で直ります</li>
           <li>直らなければ、その画面のスクショをCoworkに投げれば診断します</li>
         </ul>
@@ -577,8 +578,26 @@ const man = n => (n/10000).toLocaleString('ja-JP',{maximumFractionDigits:0}) + '
 const signed = n => (n<0?'−':'+') + '¥' + Math.abs(Math.round(n)).toLocaleString('ja-JP');
 
 /* ---- config in hash ---- */
-function readCfg(){ try{const h=location.hash.slice(1); return h?JSON.parse(decodeURIComponent(atob(h))):null;}catch(e){return null;} }
-function writeCfg(c){ location.hash = btoa(encodeURIComponent(JSON.stringify(c))); }
+function readCfg(){
+  /* v9: #ハッシュ → localStorage の順で読む。どちらかにあれば両方へ同期（毎回の再入力を撲滅） */
+  try{
+    const h=location.hash.slice(1);
+    if(h){ const c=JSON.parse(decodeURIComponent(atob(h)));
+      try{localStorage.setItem('kakeiboCfg',JSON.stringify(c));}catch(e){}
+      return c; }
+  }catch(e){}
+  try{
+    const sv=localStorage.getItem('kakeiboCfg');
+    if(sv){ const c=JSON.parse(sv);
+      try{location.hash=btoa(encodeURIComponent(JSON.stringify(c)));}catch(e){}
+      return c; }
+  }catch(e){}
+  return null;
+}
+function writeCfg(c){
+  try{localStorage.setItem('kakeiboCfg',JSON.stringify(c));}catch(e){}
+  location.hash = btoa(encodeURIComponent(JSON.stringify(c)));
+}
 
 /* ---- CSV ---- */
 function parseCSV(text){
