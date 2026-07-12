@@ -478,7 +478,7 @@ canvas{max-width:100%;}
         <div class="kpi" style="--accent:var(--purple)">
           <div class="lb">現在の体重</div>
           <div class="val" id="h-weight">—</div>
-          <div class="sub" id="h-weight-sub">体重を送ると記録されます</div>
+          <div class="sub" id="h-weight-sub">🎯 目標70.0kg・「今朝◯◯kg」で記録開始</div>
         </div>
         <div class="kpi clickable" style="--accent:var(--green)" onclick="if(window.__todayKey&&(window.__mealByDay||{})[window.__todayKey])showMealDay(window.__todayKey)">
           <div class="lb">今日の摂取カロリー</div>
@@ -488,13 +488,24 @@ canvas{max-width:100%;}
         <div class="kpi" style="--accent:var(--amber)">
           <div class="lb">今日のPFC</div>
           <div class="val" id="h-pfc" style="font-size:17px;">—</div>
-          <div class="sub">たんぱく質 / 脂質 / 炭水化物</div>
+          <div class="sub">目標 P140 / F60 / C200 g</div>
         </div>
         <div class="kpi" style="--accent:var(--income)">
           <div class="lb">記録日数</div>
           <div class="val" id="h-days">—</div>
           <div class="sub" id="h-days-sub">続けるほど見えてくる</div>
         </div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px;">
+        <h2>🎯 目標プラン <span class="tag">目標体重70kg・無理しない長期戦</span></h2>
+        <div style="display:flex;flex-wrap:wrap;gap:18px;margin:8px 0 4px;">
+          <div><div class="dt">目標体重</div><div style="font-weight:900;font-size:16px;">70.0 kg</div></div>
+          <div><div class="dt">1日の摂取目標</div><div style="font-weight:900;font-size:16px;color:var(--green)">2,000 kcal</div></div>
+          <div><div class="dt">PFC目標</div><div style="font-weight:900;font-size:16px;">P140 / F60 / C200 g</div></div>
+          <div><div class="dt">減量ペース目安</div><div style="font-weight:900;font-size:16px;">月 −2〜3 kg</div></div>
+        </div>
+        <div class="note">身長175cm・110kg・39歳で計算済み（基礎代謝 約2,000・消費 約2,750kcal/日 → −750kcalの設計）。月2〜3kgの安全ペースなら<b>年内に95kg前後→2027年夏〜秋に70kg到達</b>が現実ライン。175cmの70kgはBMI22.9で健康域のど真ん中。たんぱく質140gを死守すると筋肉を残して脂肪から落ちる。体重が減ったら3ヶ月ごとに目標カロリーを再計算します。</div>
       </div>
 
       <div class="grid2">
@@ -1222,6 +1233,8 @@ function render(d){
 
 /* ===== 🏃 健康タブ（食事ログ・体重ログ） ===== */
 const pd = s=>{ const m=String(s).match(/(\d{4})[-\/年](\d{1,2})[-\/月](\d{1,2})/); return m?m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'):null; };
+/* 健康の目標（2026-07-12 西村設定: 目標体重70kg。kcal/PFCは110kg前後・年内〜1年の減量前提の暫定値） */
+const GOAL = {weight:70, kcal:2000, p:140, f:60, c:200};
 function renderHealth(meal, weight, now){
   now = now || new Date();
   const todayKey = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
@@ -1242,7 +1255,8 @@ function renderHealth(meal, weight, now){
     $('h-weight').textContent = last.kg.toFixed(1)+' kg';
     const week = ws.slice(-7);
     const wavg = week.reduce((s,w)=>s+w.kg,0)/week.length;
-    $('h-weight-sub').innerHTML = (prev? '前回比 '+(last.kg-prev.kg>=0?'+':'−')+Math.abs(last.kg-prev.kg).toFixed(1)+'kg・':'') + '直近7回平均 '+wavg.toFixed(1)+'kg' + (last.fat? '・体脂肪 '+last.fat+'%':'');
+    const toGoal = last.kg - GOAL.weight;
+    $('h-weight-sub').innerHTML = (prev? '前回比 '+(last.kg-prev.kg>=0?'+':'−')+Math.abs(last.kg-prev.kg).toFixed(1)+'kg・':'') + '🎯70kgまであと<b>'+(toGoal>0?toGoal.toFixed(1):'0')+'kg</b>・直近7回平均 '+wavg.toFixed(1)+'kg' + (last.fat? '・体脂肪 '+last.fat+'%':'');
   }
   /* --- 食事ログ: 日付/時刻/区分/内容/推定カロリー/P/F/C/根拠/メモ --- */
   const ms=[];
@@ -1261,7 +1275,8 @@ function renderHealth(meal, weight, now){
   const today = byDay[todayKey];
   if(today){
     $('h-kcal').textContent = Math.round(today.kcal).toLocaleString()+' kcal';
-    $('h-kcal-sub').textContent = today.items.length+'件記録済み';
+    const rest = GOAL.kcal - Math.round(today.kcal);
+    $('h-kcal-sub').innerHTML = today.items.length+'件・'+(rest>=0? '目標'+GOAL.kcal.toLocaleString()+'まで残り<b>'+rest.toLocaleString()+'</b>' : '目標を<b style="color:var(--red)">'+Math.abs(rest).toLocaleString()+'超過</b>');
     $('h-pfc').textContent = 'P'+Math.round(today.p)+' / F'+Math.round(today.f)+' / C'+Math.round(today.c)+' g';
   }
   const recDays = new Set([...dayKeys, ...ws.map(w=>w.dk)]).size;
@@ -1319,8 +1334,8 @@ function renderMealCal(y, m){
     if(dd){
       sd++; sk+=dd.kcal; sp+=dd.p; sf+=dd.f; sc+=dd.c;
       const k = Math.round(dd.kcal);
-      if(k<=1800){ bg='#E7F7F0'; col='#1E9E77'; }
-      else if(k<=2300){ bg='#FDF3E3'; col='#C08A2D'; }
+      if(k<=GOAL.kcal){ bg='#E7F7F0'; col='#1E9E77'; }
+      else if(k<=GOAL.kcal+400){ bg='#FDF3E3'; col='#C08A2D'; }
       else { bg='#FDE9E7'; col='#D96C5F'; }
       body = k.toLocaleString();
     }
@@ -1331,7 +1346,7 @@ function renderMealCal(y, m){
     </div>`;
   }
   html += '</div>';
-  if(sd) html += `<div class="note" style="margin-top:8px;">この月: 記録${sd}日・平均 <b>${Math.round(sk/sd).toLocaleString()}kcal/日</b>・平均P${Math.round(sp/sd)} / F${Math.round(sf/sd)} / C${Math.round(sc/sd)}g　｜　色の目安: 🟢1,800以下 🟡2,300以下 🔴それ超（基準は「目標◯◯kcalにして」で調整可）</div>`;
+  if(sd) html += `<div class="note" style="margin-top:8px;">この月: 記録${sd}日・平均 <b>${Math.round(sk/sd).toLocaleString()}kcal/日</b>・平均P${Math.round(sp/sd)} / F${Math.round(sf/sd)} / C${Math.round(sc/sd)}g　｜　色: 🟢目標内(≤${GOAL.kcal.toLocaleString()}) 🟡やや超過(≤${(GOAL.kcal+400).toLocaleString()}) 🔴超過（基準は「目標◯◯kcalにして」で調整可）</div>`;
   else html += `<div class="note" style="margin-top:8px;">${y}年${m}月の記録はまだありません。食事写真をCoworkに投げると自動でここに貯まります。</div>`;
   $('mealCal').innerHTML = html;
 }
@@ -1695,10 +1710,11 @@ function showMonth(mIdx){
   } else html += '<div class="sub">なし</div>';
   html += '<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">💰 支払われる配当（目安 合計 '+yen(divSum)+'）</h4>';
   if(c.div.length){
-    html += [...c.div].sort((a,b)=>b.amt-a.amt).map(x=>`<div class="mrow"><div><span class="nm">${x.name}</span> <span class="catchip" style="font-size:9px;">${x.acct||''}</span></div><div class="amt">${yen(x.amt)}<span style="font-size:10px;color:var(--dim)"> 手取${yen(x.net)}</span></div></div>`).join('');
+    html += [...c.div].sort((a,b)=>b.amt-a.amt).map(x=>`<div class="mrow clickable" onclick="event.stopPropagation();showStock('${(x.name+'|'+x.acct).replace(/'/g,"\\'")}')"><div style="flex:1;"><span class="nm">${x.name}</span> <span class="catchip" style="font-size:9px;">${x.acct||''}</span></div><div class="amt">${yen(x.amt)}<span style="font-size:10px;color:var(--dim)"> 手取${yen(x.net)}</span></div><div style="color:var(--dim);font-size:16px;margin-left:8px;align-self:center;">›</div></div>`).join('');
   } else html += '<div class="sub">なし</div>';
   html += monthNav('showMonth(__M__-1)', mIdx+1);
-  window.__stockCtx = {keys: c.yutai.map(x=>x.h.name+'|'+x.h.acct), cur:null, back: ()=>showMonth(mIdx)};
+  /* 優待銘柄＋配当銘柄の両方をナビ対象に（重複は除去） */
+  window.__stockCtx = {keys: [...c.yutai.map(x=>x.h.name+'|'+x.h.acct), ...c.div.map(x=>x.name+'|'+x.acct)].filter((v,i,a)=>a.indexOf(v)===i), cur:null, back: ()=>showMonth(mIdx)};
   openModal(html);
 }
 
