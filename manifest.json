@@ -1,0 +1,13 @@
+{
+  "name": "西村OS — 資産も健康も、ぜんぶここに",
+  "short_name": "西村OS",
+  "description": "西村の資産・家計・優待株・健康をまるごとサポート",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F2F4F9",
+  "theme_color": "#4B54B8",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
