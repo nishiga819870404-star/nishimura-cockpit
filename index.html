@@ -695,6 +695,8 @@ const RECLASS = [
  ['趣味・娯楽',['ﾔﾌ-','BSBショップス','セレクション','Ａｍａｚｏｎ　Ｄｏｗｎｌｏａｄｓ']],
 ];
 function catOverride(text, cat){
+  /* 強制ルール: 楽天キャッシュチャージはNISA積立の一部(月5万×2系統で計10万)なので「投資」に統一 */
+  if(String(text).includes('楽天キャッシュ')) return '投資';
   if(cat && cat!=='その他') return cat; /* 手動分類済みは尊重、その他だけ再分類 */
   for(const [c,keys] of RECLASS){ if(keys.some(k=>String(text).includes(k))) return c; }
   return cat||'その他';
@@ -1250,7 +1252,8 @@ function showStock(key){
     <div class="mrow"><div class="nm">年間配当（額面）</div><div class="amt">${h.divTotal?yen(h.divTotal):'−'}</div></div>
     <div class="mrow"><div class="nm">手取り目安</div><div class="amt">${h.divNet?yen(h.divNet):'−'}<span style="font-size:10px;color:var(--dim)"> (${h.acct.includes('NISA')?'非課税':'20.315%控除'})</span></div></div>
     <div class="mrow"><div><span class="nm">支払回数</span><div class="dt">${divFreq}${divCount>0?' ／ 1回あたり約'+yen(divPerTime):''}</div></div><div style="font-size:12px;color:var(--dim);">${h.rights||'権利月不明'}</div></div>
-    <div class="mrow"><div class="nm">配当利回り</div><div class="amt">${h.value&&h.divTotal?(h.divTotal/h.value*100).toFixed(2)+'%':'−'}</div></div>`;
+    <div class="mrow"><div class="nm">配当利回り</div><div class="amt">${h.value&&h.divTotal?(h.divTotal/h.value*100).toFixed(2)+'%':'−'}</div></div>
+    <div class="mrow"><div><span class="nm">配当利回り（取得単価ベース）</span><div class="dt">YOC＝買値に対する利回り${h.acqPrice&&/暫定/.test(h.memo||'')?'・❓暫定単価':''}</div></div><div class="amt" style="color:var(--green)">${h.acqPrice&&h.shares&&h.divTotal?(h.divTotal/(h.acqPrice*h.shares)*100).toFixed(2)+'%':'−'}</div></div>`;
   html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">💰 配当の受取実績</h4>`;
   if(dh){
     const years = Object.keys(dh.byYear).sort().reverse();
