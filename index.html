@@ -324,9 +324,13 @@ canvas{max-width:100%;}
           <div class="sub" id="k-port-sub">—</div>
         </div>
         <div class="kpi clickable" style="--accent:var(--green)" onclick="showDivBreakdown()" title="クリックで銘柄別内訳">
-          <div class="lb">年間配当（税引前） <span style="font-size:10px;color:#8A93A6;">›内訳</span></div>
+          <div class="lb">年間配当<span id="divModeLb">（税引前）</span> <span style="font-size:10px;color:#8A93A6;">›内訳</span></div>
           <div class="val" id="k-div">—</div>
           <div class="sub" id="k-div-sub">—</div>
+          <div style="margin-top:7px;display:flex;gap:4px;">
+            <button id="dm-gross" onclick="event.stopPropagation();setDivMode('gross')" style="flex:1;border:1px solid var(--line);border-radius:7px;padding:3px 0;font-size:10.5px;font-weight:700;cursor:pointer;background:#fff;color:#8A93A6;">税引前</button>
+            <button id="dm-net" onclick="event.stopPropagation();setDivMode('net')" style="flex:1;border:1px solid var(--line);border-radius:7px;padding:3px 0;font-size:10.5px;font-weight:700;cursor:pointer;background:#fff;color:#8A93A6;">税引後</button>
+          </div>
         </div>
         <div class="kpi" style="--accent:var(--income)">
           <div class="lb">今年の収支累計</div>
@@ -776,7 +780,13 @@ async function boot(){
   $('app').classList.remove('hidden');
 }
 
+function divMode(){ try{return localStorage.getItem('divMode')||'gross';}catch(e){return 'gross';} }
+function setDivMode(m){
+  try{localStorage.setItem('divMode',m);}catch(e){}
+  if(window.__lastData) render(window.__lastData);
+}
 function render(d){
+  window.__lastData = d;
   const now=new Date();
   const alerts=[];
 
@@ -847,11 +857,15 @@ function render(d){
   /* ===== portfolio ===== */
   const holdings=[];
   for(let i=1;i<d.port.length;i++){
-    const r=d.port[i];const name=(r[1]||'').trim();const value=num(r[6]);
-    if(!name||name==='合計'||value===null)continue;
+    const r=d.port[i];const name=(r[1]||'').trim();const rawVal=num(r[6]);
+    if(!name||name==='合計')continue;
+    const sh=num(r[3])||0, cur=num(r[5]);
+    /* 評価額は株価×株数を優先（毎朝の株価自動更新でG列が古くても正しい値になる）。どちらか欠けたらG列の値 */
+    const value = (cur&&sh) ? Math.round(cur*sh) : rawVal;
+    if(value===null)continue;
     const acct=(r[2]||'').trim();
     const gross=num(r[8])||0;
-    holdings.push({name,code:String(r[0]||'').trim(),acct,shares:num(r[3])||0,acqPrice:num(r[4]),curPrice:num(r[5]),
+    holdings.push({name,code:String(r[0]||'').trim(),acct,shares:sh,acqPrice:num(r[4]),curPrice:cur,
       value,divTotal:gross,divNet:acct.includes('NISA')?gross:Math.round(gross*0.79685),
       rights:String(r[10]||''),ytype:(r[11]||''),yutai:(r[12]||'').split('/')[0].trim(),yutaiFull:String(r[12]||''),yval:num(r[13])||0,memo:String(r[14]||''),detail:String(r[15]||'')});
   }
@@ -860,9 +874,16 @@ function render(d){
   const totalYval=holdings.reduce((s,h)=>s+h.yval,0);
   $('k-port').textContent=yen(totalVal);
   $('k-port-sub').textContent=holdings.length+'銘柄'+(latest&&latest.rk+latest.nikko+latest.sbi>0?' / 証券資産の'+Math.round(totalVal/(latest.rk+latest.nikko+latest.sbi)*100)+'%':'');
-  $('k-div').textContent=yen(totalDiv);
   const totalNet = holdings.reduce((s,h)=>s+h.divNet,0);
-  $('k-div-sub').textContent='手取り目安 '+yen(totalNet)+'（NISA非課税/特定20.315%控除）';
+  const dm = divMode();
+  window.__divModeVal = dm;
+  $('divModeLb').textContent = dm==='net' ? '（税引後）' : '（税引前）';
+  $('k-div').textContent = yen(dm==='net' ? totalNet : totalDiv);
+  $('k-div-sub').textContent = dm==='net'
+    ? '税引前 '+yen(totalDiv)+'。NISA分は非課税のため同額'
+    : '手取り目安 '+yen(totalNet)+'（NISA非課税/特定20.315%控除）';
+  const actBtn = (el,on)=>{ el.style.background = on?'var(--green)':'#fff'; el.style.color = on?'#fff':'#8A93A6'; el.style.borderColor = on?'var(--green)':'var(--line)'; };
+  actBtn($('dm-gross'), dm!=='net'); actBtn($('dm-net'), dm==='net');
 
   /* pie: 日本株/投信の区分（投信≒証券合計−優待株評価額の概算） */
   if(latest){
@@ -1092,10 +1113,12 @@ function render(d){
     const eligOnly = $('eligOnly').checked;
     const cal = buildCal(eligOnly);
     const nowM = now.getMonth();
+    const dNet = window.__divModeVal==='net';
+    const dv = x => dNet ? x.net : x.amt;
     $('y-now').textContent=cal[nowM].yutai.length;
-    $('y-div-now').textContent=yen(cal[nowM].div.reduce((s,x)=>s+x.amt,0));
+    $('y-div-now').textContent=yen(cal[nowM].div.reduce((s,x)=>s+dv(x),0))+(dNet?'（税引後）':'');
     $('ycal').innerHTML=cal.map((c,i)=>{
-      const divSum=c.div.reduce((s,x)=>s+x.amt,0);
+      const divSum=c.div.reduce((s,x)=>s+dv(x),0);
       return `<div class="ymonth clickable ${i===nowM?'now':''}" onclick="showMonth(${i})">
         <div class="mh"><span class="mn">${i+1}月</span><span class="cnt">🎁${c.yutai.length}銘柄</span></div>
         ${c.yutai.length?`<div class="sec">権利確定</div><div class="names">${c.yutai.slice(0,4).map(x=>x.h.name).join('、')}${c.yutai.length>4?' 他'+(c.yutai.length-4)+'件':''}</div>`:''}
@@ -1188,17 +1211,20 @@ function showPortBreakdown(){
   openModal(html);
 }
 function showDivBreakdown(){
-  const hs = (window.__holdings||[]).filter(h=>h.divTotal>0).sort((a,b)=>b.divTotal-a.divTotal);
+  const dNet = window.__divModeVal==='net';
+  const pick = h => dNet ? h.divNet : h.divTotal;
+  const hs = (window.__holdings||[]).filter(h=>h.divTotal>0).sort((a,b)=>pick(b)-pick(a));
   if(!hs.length){openModal('<h3>年間配当</h3><div class="sub">データなし</div>');return;}
   const total = hs.reduce((s,h)=>s+h.divTotal,0);
   const totalNet = hs.reduce((s,h)=>s+h.divNet,0);
-  let html = `<h3>年間配当の内訳（税引前）</h3><div class="sub">${hs.length}銘柄・合計 ${yen(total)}（手取り目安 ${yen(totalNet)}）。銘柄クリックで詳細</div>`;
+  let html = `<h3>年間配当の内訳（${dNet?'税引後':'税引前'}）</h3><div class="sub">${hs.length}銘柄・${dNet?'税引後':'税引前'}合計 ${yen(dNet?totalNet:total)}（${dNet?'税引前 '+yen(total):'手取り目安 '+yen(totalNet)}）。銘柄クリックで詳細。表示は資産サマリーの税引前/税引後ボタンで切替</div>`;
   hs.forEach(h=>{
-    const yld = h.value ? (h.divTotal/h.value*100).toFixed(2) : null;
+    const yld = h.value ? (pick(h)/h.value*100).toFixed(2) : null;
+    const isNisa = h.acct.includes('NISA');
     html += `<div class="mrow clickable" onclick="showStock('${(h.name+'|'+h.acct).replace(/'/g,"\\'")}')">
-      <div style="flex:1;"><span class="nm">${h.name}</span><div class="dt">${h.acct}${yld?'・利回り'+yld+'%':''}${h.acct.includes('NISA')?'・非課税':''}</div>
-        <div style="height:6px;background:#EDF0F7;border-radius:3px;margin-top:4px;"><div style="height:6px;width:${Math.max(1,Math.round(h.divTotal/hs[0].divTotal*100))}%;background:var(--green);border-radius:3px;"></div></div>
-      </div><div style="text-align:right;margin-left:12px;"><div class="amt" style="color:var(--green)">${yen(h.divTotal)}</div><div class="dt">手取り ${yen(h.divNet)}</div></div></div>`;
+      <div style="flex:1;"><span class="nm">${h.name}</span><div class="dt">${h.acct}${yld?'・利回り'+yld+'%':''}${isNisa?'・非課税':''}</div>
+        <div style="height:6px;background:#EDF0F7;border-radius:3px;margin-top:4px;"><div style="height:6px;width:${Math.max(1,Math.round(pick(h)/pick(hs[0])*100))}%;background:var(--green);border-radius:3px;"></div></div>
+      </div><div style="text-align:right;margin-left:12px;"><div class="amt" style="color:var(--green)">${yen(pick(h))}</div><div class="dt">${dNet?(isNisa?'非課税（額面と同額）':'税引前 '+yen(h.divTotal)):'手取り '+yen(h.divNet)}</div></div></div>`;
   });
   openModal(html);
 }
