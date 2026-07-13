@@ -226,6 +226,9 @@ canvas{max-width:100%;}
 .mrow .amt{font-weight:800;color:var(--green);white-space:nowrap;font-variant-numeric:tabular-nums;}
 .toggle{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--dim);cursor:pointer;user-select:none;margin-bottom:12px;}
 .toggle input{width:16px;height:16px;accent-color:var(--header);}
+.metricBtn{display:inline-flex;align-items:center;padding:6px 12px;border-radius:20px;border:1.5px solid var(--line);background:#fff;color:var(--dim);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;}
+.metricBtn:hover{border-color:var(--purple);color:var(--purple);}
+.metricBtn.active{background:var(--purple);border-color:var(--purple);color:#fff;}
 .catchip{display:inline-block;font-size:10px;font-weight:700;border-radius:5px;padding:2px 8px;background:#F0F2FA;color:var(--header);}
 .clickable{cursor:pointer;}
 .clickable:hover{background:#F5F7FD !important;}
@@ -534,8 +537,17 @@ canvas{max-width:100%;}
       <div class="grid2">
         <div class="card">
           <h2><img data-peng="good" alt="" style="height:36px;vertical-align:middle;margin-right:6px;">体重の推移 <span class="tag">週平均で見る（1日の上下に一喜一憂しない）</span></h2>
+          <div id="bodyMetricToggle" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+            <button type="button" class="metricBtn active" data-metric="kg" onclick="toggleBodyMetric('kg')">体重</button>
+            <button type="button" class="metricBtn" data-metric="fat" onclick="toggleBodyMetric('fat')">体脂肪率</button>
+            <button type="button" class="metricBtn" data-metric="muscle" onclick="toggleBodyMetric('muscle')">筋肉量</button>
+            <button type="button" class="metricBtn" data-metric="fatMass" onclick="toggleBodyMetric('fatMass')">体脂肪量</button>
+            <button type="button" class="metricBtn" data-metric="bmr" onclick="toggleBodyMetric('bmr')">基礎代謝</button>
+            <button type="button" class="metricBtn" data-metric="water" onclick="toggleBodyMetric('water')">水分量</button>
+            <button type="button" class="metricBtn" data-metric="bmi" onclick="toggleBodyMetric('bmi')">BMI</button>
+          </div>
           <canvas id="weightChart" height="230"></canvas>
-          <div class="note" id="weightNote">「今朝◯◯.◯kg」と送るか体重計の写真で記録。毎朝same時間帯の測定が理想。</div>
+          <div class="note" id="weightNote">「今朝◯◯.◯kg」と送るか体重計の写真で記録。毎朝同じ時間帯の測定が理想。</div>
         </div>
         <div class="card">
           <h2>日別カロリー <span class="tag">直近14日</span></h2>
@@ -776,6 +788,45 @@ $('reconfig').addEventListener('click',()=>{
 /* ---- charts registry ---- */
 const charts={};
 function mkChart(id,cfg){ if(charts[id])charts[id].destroy(); charts[id]=new Chart($(id),cfg); }
+const METRICS = {
+  kg:      {label:'体重',     unit:'kg',   color:'#8E7CE0', bg:'rgba(142,124,224,0.10)', decimals:1},
+  fat:     {label:'体脂肪率', unit:'%',    color:'#F5A623', bg:'rgba(245,166,35,0.10)',  decimals:1},
+  muscle:  {label:'筋肉量',   unit:'kg',   color:'#43C59E', bg:'rgba(67,197,158,0.10)',  decimals:2},
+  fatMass: {label:'体脂肪量', unit:'kg',   color:'#E85D75', bg:'rgba(232,93,117,0.10)',  decimals:2},
+  bmr:     {label:'基礎代謝', unit:'kcal', color:'#5AB6F2', bg:'rgba(90,182,242,0.10)',  decimals:0},
+  water:   {label:'水分量',   unit:'%',    color:'#4FC3E0', bg:'rgba(79,195,224,0.10)',  decimals:1},
+  bmi:     {label:'BMI',      unit:'',     color:'#B08D57', bg:'rgba(176,141,87,0.10)',  decimals:1}
+};
+function renderWeightChart(metric){
+  metric = metric || window.__bodyMetric || 'kg';
+  window.__bodyMetric = metric;
+  const ws = window.__weights || [];
+  if(!ws.length) return;
+  const cfg = METRICS[metric];
+  const vals = ws.map(w=> (w[metric]===undefined? null : w[metric]));
+  const mov = ws.map((w,i)=>{
+    const win = ws.slice(Math.max(0,i-6), i+1).filter(x=> x[metric]!=null);
+    return win.length ? win.reduce((s,x)=>s+x[metric],0)/win.length : null;
+  });
+  mkChart('weightChart',{type:'line',data:{
+    labels:ws.map(w=>w.dk.slice(5).replace('-','/')),
+    datasets:[
+      {label:cfg.label,data:vals,borderColor:cfg.color,backgroundColor:cfg.bg,fill:true,tension:0.25,pointRadius:3,borderWidth:2,spanGaps:true},
+      {label:'7日平均',data:mov,borderColor:'#2E3440',borderDash:[6,4],pointRadius:0,borderWidth:2,tension:0.3,fill:false,spanGaps:true}
+    ]},options:{plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:10.5},boxWidth:12}}},
+    scales:{x:{ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
+      y:{ticks:{color:'#8A93A6',font:{size:10},callback:v=>v+cfg.unit},grid:{color:'#EDF0F7'}}}}});
+  document.querySelectorAll('#bodyMetricToggle .metricBtn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.metric===metric);
+  });
+  const withVal = [...ws].reverse().find(w=> w[metric]!=null);
+  const noteEl = $('weightNote');
+  if(noteEl){
+    noteEl.innerHTML = (withVal? '直近: <b>'+withVal.dk+'</b> '+withVal[metric].toFixed(cfg.decimals)+cfg.unit+'（'+cfg.label+'）　': cfg.label+'はまだ記録なし　') + '「今朝◯◯.◯kg」と送るか体重計の写真で記録。毎朝同じ時間帯の測定が理想。';
+  }
+}
+function toggleBodyMetric(m){ renderWeightChart(m); }
+window.toggleBodyMetric = toggleBodyMetric;
 
 const CAT_COLORS = ['#5AB6F2','#F06E9C','#43C59E','#F5A623','#8E7CE0','#4DD0E1','#FF8A65','#AED581','#BA68C8','#90A4AE','#FFD54F','#7986CB'];
 
@@ -1285,7 +1336,7 @@ function renderHealth(meal, weight, now){
     for(let i=1;i<weight.length;i++){
       const r=weight[i]; const dk=pd(r[0]); const kg=num(r[1]);
       if(!dk||kg===null) continue;
-      ws.push({dk, kg, fat:num(r[2]), memo:r[3]||''});
+      ws.push({dk, kg, fat:num(r[2]), memo:r[3]||'', muscle:num(r[4]), fatMass:num(r[5]), bmr:num(r[6]), water:num(r[7]), bmi:num(r[8])});
     }
   }
   ws.sort((a,b)=>a.dk<b.dk?-1:1);
@@ -1296,7 +1347,7 @@ function renderHealth(meal, weight, now){
     const week = ws.slice(-7);
     const wavg = week.reduce((s,w)=>s+w.kg,0)/week.length;
     const toGoal = last.kg - GOAL.weight;
-    $('h-weight-sub').innerHTML = (prev? '前回比 '+(last.kg-prev.kg>=0?'+':'−')+Math.abs(last.kg-prev.kg).toFixed(1)+'kg・':'') + '🎯70kgまであと<b>'+(toGoal>0?toGoal.toFixed(1):'0')+'kg</b>・直近7回平均 '+wavg.toFixed(1)+'kg' + (last.fat? '・体脂肪 '+last.fat+'%':'');
+    $('h-weight-sub').innerHTML = (prev? '前回比 '+(last.kg-prev.kg>=0?'+':'−')+Math.abs(last.kg-prev.kg).toFixed(1)+'kg・':'') + '🎯70kgまであと<b>'+(toGoal>0?toGoal.toFixed(1):'0')+'kg</b>・直近7回平均 '+wavg.toFixed(1)+'kg' + (last.fat? '・体脂肪 '+last.fat+'%':'') + (last.muscle!=null? '・筋肉量 '+last.muscle.toFixed(1)+'kg':'') + (last.bmi!=null? '・BMI '+last.bmi.toFixed(1):'');
 
     /* 中間チェックポイント（100kg切り・期限あり） */
     if($('h-checkpoint')){
@@ -1346,17 +1397,9 @@ function renderHealth(meal, weight, now){
   const recDays = new Set([...dayKeys, ...ws.map(w=>w.dk)]).size;
   if(recDays){ $('h-days').textContent = recDays+'日'; $('h-days-sub').textContent = (ws.length?'体重'+ws.length+'回・':'')+'食事'+ms.length+'件'; }
 
-  /* 体重チャート（実測＋7日移動平均） */
+  /* 体重チャート（実測＋7日移動平均・体組成トグル対応） */
   if(ws.length){
-    const mov = ws.map((w,i)=>{ const win=ws.slice(Math.max(0,i-6),i+1); return win.reduce((s,x)=>s+x.kg,0)/win.length; });
-    mkChart('weightChart',{type:'line',data:{
-      labels:ws.map(w=>w.dk.slice(5).replace('-','/')),
-      datasets:[
-        {label:'体重',data:ws.map(w=>w.kg),borderColor:'#8E7CE0',backgroundColor:'rgba(142,124,224,0.08)',fill:true,tension:0.25,pointRadius:3,borderWidth:2},
-        {label:'7日平均',data:mov,borderColor:'#2E3440',borderDash:[6,4],pointRadius:0,borderWidth:2,tension:0.3,fill:false}
-      ]},options:{plugins:{legend:{position:'bottom',labels:{color:'#2E3440',font:{size:10.5},boxWidth:12}}},
-      scales:{x:{ticks:{color:'#8A93A6',font:{size:10}},grid:{display:false}},
-        y:{ticks:{color:'#8A93A6',font:{size:10},callback:v=>v+'kg'},grid:{color:'#EDF0F7'}}}}});
+    renderWeightChart(window.__bodyMetric || 'kg');
   }
   /* 日別カロリーチャート（直近14日） */
   if(dayKeys.length){
