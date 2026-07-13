@@ -509,20 +509,26 @@ canvas{max-width:100%;}
           <div class="val" id="h-days">—</div>
           <div class="sub" id="h-days-sub">続けるほど見えてくる</div>
         </div>
+        <div class="kpi" style="--accent:var(--red)">
+          <div class="lb">🎯 100kg切りチェックポイント</div>
+          <div class="val" id="h-checkpoint">—</div>
+          <div class="sub" id="h-checkpoint-sub">2026年10月末までに100kg切りが目標</div>
+        </div>
       </div>
 
       <div class="card" style="margin-bottom:14px;">
-        <h2>🎯 目標プラン <span class="tag">目標体重70kg・無理しない長期戦</span></h2>
+        <h2>🎯 目標プラン <span class="tag">最終70kg・中間チェックポイント100kg(10月末)</span></h2>
         <div style="display:flex;align-items:center;gap:16px;">
         <img id="pengMood" data-peng="def" alt="" style="height:96px;flex-shrink:0;" title="今日の摂取量でペンギンの表情が変わります">
         <div style="display:flex;flex-wrap:wrap;gap:18px;margin:8px 0 4px;flex:1;">
-          <div><div class="dt">目標体重</div><div style="font-weight:900;font-size:16px;">70.0 kg</div></div>
+          <div><div class="dt">最終目標体重</div><div style="font-weight:900;font-size:16px;">70.0 kg</div></div>
+          <div><div class="dt">中間チェックポイント</div><div style="font-weight:900;font-size:16px;color:var(--red)">100kg未満（10/31まで）</div></div>
           <div><div class="dt">1日の摂取目標</div><div style="font-weight:900;font-size:16px;color:var(--green)">2,000 kcal</div></div>
           <div><div class="dt">PFC目標</div><div style="font-weight:900;font-size:16px;">P140 / F60 / C200 g</div></div>
           <div><div class="dt">減量ペース目安</div><div style="font-weight:900;font-size:16px;">月 −2〜3 kg</div></div>
         </div>
         </div>
-        <div class="note">身長175cm・110kg・39歳で計算済み（基礎代謝 約2,000・消費 約2,750kcal/日 → −750kcalの設計）。月2〜3kgの安全ペースなら<b>年内に95kg前後→2027年夏〜秋に70kg到達</b>が現実ライン。175cmの70kgはBMI22.9で健康域のど真ん中。たんぱく質140gを死守すると筋肉を残して脂肪から落ちる。体重が減ったら3ヶ月ごとに目標カロリーを再計算します。</div>
+        <div class="note">身長175cm・39歳で計算済み（基礎代謝 約2,000・消費 約2,750kcal/日 → −750kcalの設計）。西村の希望（2026-07-13）で<b>2026年10月末までに100kg切り</b>を中間チェックポイントに設定——初回計測110.40kg（2026-07-13）からだと約110日で−10.4kg・週−0.7kg弱のペースが必要。今の2000kcal設計（−750kcal/日）でほぼ射程圏内だが、確実に届かせるには気持ちプラスの上乗せがいる（間食をもう一声控える／軽い運動をプラスする、で十分届く差）。序盤は水分が抜けて減りが早く出やすいので、そのアドバンテージも味方になるはず。最終ゴールは変わらず<b>70kg・2027年夏〜秋到達</b>。体重が減ったら3ヶ月ごとに目標カロリーを再計算します。</div>
       </div>
 
       <div class="grid2">
@@ -1267,6 +1273,8 @@ function render(d){
 const pd = s=>{ const m=String(s).match(/(\d{4})[-\/年](\d{1,2})[-\/月](\d{1,2})/); return m?m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'):null; };
 /* 健康の目標（2026-07-12 西村設定: 目標体重70kg。kcal/PFCは110kg前後・年内〜1年の減量前提の暫定値） */
 const GOAL = {weight:70, kcal:2000, p:140, f:60, c:200};
+/* 中間チェックポイント（2026-07-13 西村指示: モチベ維持のため10月末までに100kg切りを目標に） */
+const CHECKPOINT = {weight:100, deadline:'2026-10-31', label:'10月末までに100kg切り'};
 function renderHealth(meal, weight, now){
   now = now || new Date();
   const todayKey = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
@@ -1289,6 +1297,25 @@ function renderHealth(meal, weight, now){
     const wavg = week.reduce((s,w)=>s+w.kg,0)/week.length;
     const toGoal = last.kg - GOAL.weight;
     $('h-weight-sub').innerHTML = (prev? '前回比 '+(last.kg-prev.kg>=0?'+':'−')+Math.abs(last.kg-prev.kg).toFixed(1)+'kg・':'') + '🎯70kgまであと<b>'+(toGoal>0?toGoal.toFixed(1):'0')+'kg</b>・直近7回平均 '+wavg.toFixed(1)+'kg' + (last.fat? '・体脂肪 '+last.fat+'%':'');
+
+    /* 中間チェックポイント（100kg切り・期限あり） */
+    if($('h-checkpoint')){
+      const cpNeed = last.kg - CHECKPOINT.weight;
+      const cpDeadline = new Date(CHECKPOINT.deadline+'T23:59:59+09:00');
+      const daysLeft = Math.ceil((cpDeadline - now)/86400000);
+      if(cpNeed<=0){
+        $('h-checkpoint').textContent = '達成🎉';
+        $('h-checkpoint-sub').textContent = CHECKPOINT.label+'は達成済み！';
+      } else if(daysLeft>0){
+        const weeksLeft = daysLeft/7;
+        const paceNeeded = cpNeed/weeksLeft;
+        $('h-checkpoint').innerHTML = 'あと<b>'+cpNeed.toFixed(1)+'kg</b>';
+        $('h-checkpoint-sub').textContent = '残り'+daysLeft+'日（10/31まで）・必要ペース 週−'+paceNeeded.toFixed(2)+'kg';
+      } else {
+        $('h-checkpoint').textContent = cpNeed.toFixed(1)+'kg 届かず';
+        $('h-checkpoint-sub').textContent = '10/31は過ぎたので次の区切りを相談しよう';
+      }
+    }
   }
   /* --- 食事ログ: 日付/時刻/区分/内容/推定カロリー/P/F/C/根拠/メモ --- */
   const ms=[];
