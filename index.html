@@ -298,12 +298,15 @@ canvas{max-width:100%;}
 <!-- app -->
 <div class="layout hidden" id="app">
   <nav>
-    <div class="navitem active" data-page="p-summary"><span class="ico">📊</span>資産サマリー</div>
+    <div class="navitem active" data-page="p-today"><span class="ico">🏠</span>今日</div>
+    <div class="navitem" data-page="p-summary"><span class="ico">📊</span>資産サマリー</div>
     <div class="navitem" data-page="p-cf"><span class="ico">💰</span>収支推移</div>
     <div class="navitem" data-page="p-detail"><span class="ico">🧾</span>費目別詳細</div>
     <div class="navitem" data-page="p-yutai"><span class="ico">🎁</span>優待・配当</div>
+    <div class="navitem" data-page="p-shop"><span class="ico">🛒</span>買うもの</div>
     <div class="navitem" data-page="p-health"><span class="ico">🏃</span>健康</div>
     <div class="navitem" data-page="p-report"><span class="ico">📝</span>月次レポート</div>
+    <div class="navitem" data-page="p-study"><span class="ico">📚</span>勉強</div>
     <div class="navitem" data-page="p-manual"><span class="ico">📖</span>使い方</div>
   </nav>
 
@@ -311,8 +314,64 @@ canvas{max-width:100%;}
     <div id="errbox"></div>
     <div id="alertbox"></div>
 
+    <!-- ===== page: today（今日のダッシュボード） ===== -->
+    <style>
+      #p-today .today-hero{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#5B67CA,#8E7CE0);color:#fff;border-radius:16px;padding:15px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
+      #p-today .today-peng{width:74px;height:74px;object-fit:contain;flex:0 0 auto;background:rgba(255,255,255,.92);border-radius:14px;padding:3px}
+      #p-today .today-date{font-size:12px;font-weight:700;opacity:.9}
+      #p-today .today-msg{font-size:15px;font-weight:800;line-height:1.5;margin-top:3px}
+      #p-today .tk-item{display:flex;align-items:flex-start;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line)}
+      #p-today .tk-item.done{opacity:.5}
+      #p-today .tk-item.done .tk-name{text-decoration:line-through}
+      #p-today .tk-check{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);flex:0 0 auto;cursor:pointer;display:grid;place-items:center;color:#fff;font-size:13px;margin-top:1px}
+      #p-today .tk-check.on{background:var(--green);border-color:var(--green)}
+      #p-today .tk-body{flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+      #p-today .tk-badge{border-radius:5px;padding:1px 6px;color:#fff;font-size:12px}
+      #p-today .tk-name{font-weight:700;font-size:14px}
+      #p-today .tk-od{background:#FDECEF;color:var(--red);font-size:10px;font-weight:800;border-radius:4px;padding:1px 5px}
+      #p-today .tk-meta{font-size:12px;color:var(--dim)}
+      #p-today .tk-empty{color:var(--dim);font-size:13px;padding:14px 2px;text-align:center}
+      #p-today .today-mini{cursor:pointer;text-align:center;padding:14px}
+      #p-today .tm-ico{font-size:24px}
+      #p-today .tm-label{font-size:12px;color:var(--dim);font-weight:700;margin-top:2px}
+      #p-today .tm-val{font-size:15px;font-weight:900;color:var(--text);margin-top:3px}
+      #p-today .today-links{display:flex;gap:8px;margin-top:2px}
+      #p-today .today-links button{flex:1;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:11px 6px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;font-size:13px;box-shadow:var(--shadow)}
+    </style>
+    <section id="p-today">
+      <div class="today-hero">
+        <img id="todayPeng" class="today-peng" alt="ペンギン">
+        <div>
+          <div class="today-date" id="todayDate"></div>
+          <div class="today-msg" id="todayMsg">今日も一歩ずつ！</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📌 今日やること <span class="tag" id="todayCount">—</span></h2>
+        <div id="todayTasks"></div>
+      </div>
+
+      <div class="grid2">
+        <div class="card today-mini" onclick="__today.go('p-study')">
+          <div class="tm-ico">📚</div><div class="tm-label">勉強</div>
+          <div class="tm-val" id="todayStudy">—</div>
+        </div>
+        <div class="card today-mini" onclick="__today.go('p-health')">
+          <div class="tm-ico">🏃</div><div class="tm-label">健康</div>
+          <div class="tm-val" style="font-size:13px;color:var(--dim)">記録する →</div>
+        </div>
+      </div>
+
+      <div class="today-links">
+        <button onclick="__today.go('p-shop')">🛒 買うもの</button>
+        <button onclick="__today.go('p-summary')">📊 資産</button>
+        <button onclick="__today.go('p-yutai')">🎁 優待</button>
+      </div>
+    </section>
+
     <!-- ===== page: summary ===== -->
-    <section id="p-summary">
+    <section id="p-summary" class="hidden">
       <div class="card">
         <h2>純資産 <span class="tag" id="snap-date">—</span></h2>
         <div class="formula">
@@ -379,10 +438,7 @@ canvas{max-width:100%;}
         <div class="note">スプシの資産スナップショットにJ列:りそな / K列:城北信金 / L列:楽天投信 / M列:SBI投信 を追記すると、月末残高の内訳がここに出ます。</div>
       </div>
 
-      <div class="card">
-        <h2>🛍 欲しいものリスト <span class="tag">大きい買い物の計画</span></h2>
-        <div id="wishList"><div class="note">チャットで「◯◯を欲しいものリストに入れて」と言うとここに貯まります。スプシに「欲しいものリスト」シート（列: 追加日/品名/カテゴリ/推定価格/優先度/状態/メモ・URL）を作ってCSV公開し、⚙設定にURLを入れると表示されます。</div></div>
-      </div>
+      <!-- 欲しいものリストは「🛒買うもの」タブへ移動しました -->
 
       <div class="grid2">
         <div class="card">
@@ -614,6 +670,70 @@ canvas{max-width:100%;}
 - ウォッチ3銘柄(北の達人・スタジオアリス・オロ)の目標株価を決める
 </script>
       </div>
+    </section>
+
+    <!-- ===== page: shop（買うものメモ） ===== -->
+    <style>
+      #p-shop .shop-add{display:flex;flex-direction:column;gap:8px;margin:6px 0 14px}
+      #p-shop input,#p-shop select{border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:#fff;color:var(--text);width:100%}
+      #p-shop .shop-row{display:flex;gap:8px}
+      #p-shop .shop-btn{background:var(--header);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;white-space:nowrap}
+      #p-shop .shop-views{display:flex;gap:8px;margin-bottom:8px}
+      #p-shop .shop-views button{flex:1;background:#F0F2FA;border:1.5px solid var(--line);border-radius:10px;padding:9px;font-weight:700;color:var(--dim);cursor:pointer;font-family:inherit}
+      #p-shop .shop-views button.on{background:var(--header);color:#fff;border-color:var(--header)}
+      #p-shop .shop-item{display:flex;align-items:flex-start;gap:10px;padding:11px 4px;border-bottom:1px solid var(--line)}
+      #p-shop .shop-item.done{opacity:.5}
+      #p-shop .shop-item.done .si-name{text-decoration:line-through}
+      #p-shop .si-check{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);flex:0 0 auto;cursor:pointer;display:grid;place-items:center;font-size:13px;color:#fff;margin-top:1px}
+      #p-shop .si-check.on{background:var(--green);border-color:var(--green)}
+      #p-shop .si-body{flex:1;min-width:0}
+      #p-shop .si-name{font-weight:700;font-size:14px;word-break:break-word}
+      #p-shop .si-meta{font-size:12px;color:var(--dim);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+      #p-shop .si-badge{font-size:11px;font-weight:800;border-radius:5px;padding:2px 7px;color:#fff}
+      #p-shop .si-del{background:none;border:none;color:var(--dim);cursor:pointer;font-size:15px;padding:2px 6px;flex:0 0 auto}
+      #p-shop .shop-group{font-size:12px;font-weight:800;color:var(--header);margin:14px 0 2px}
+      #p-shop .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+      #p-shop .cal-nav{background:#F0F2FA;border:1px solid var(--line);border-radius:8px;padding:5px 14px;cursor:pointer;font-weight:700;font-family:inherit}
+      #p-shop .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+      #p-shop .cal-wd{text-align:center;font-size:10px;color:var(--dim);font-weight:700;padding:2px 0}
+      #p-shop .cal-d{min-height:54px;border:1px solid var(--line);border-radius:8px;padding:3px}
+      #p-shop .cal-d.today{border-color:var(--header);background:#F0F2FA}
+      #p-shop .cal-dn{font-weight:700;color:var(--dim);font-size:11px}
+      #p-shop .cal-ev{font-size:9px;border-radius:4px;padding:1px 3px;margin-top:2px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #p-shop .shop-empty{text-align:center;color:var(--dim);padding:22px 10px;font-size:13px}
+    </style>
+    <section id="p-shop" class="hidden">
+      <div class="card">
+        <h2>🛒 買うものメモ <span class="tag">買い忘れ・予約・発売日</span></h2>
+        <div class="shop-add">
+          <input id="shopName" placeholder="品名・やること（例: ポケカ新弾／洗剤／散髪）" autocomplete="off">
+          <div class="shop-row">
+            <select id="shopKind"></select>
+            <input id="shopDate" type="date" style="max-width:150px">
+          </div>
+          <div class="shop-row">
+            <input id="shopPlace" placeholder="場所・メモ（例: ウエルシア／Amazon）" autocomplete="off">
+            <button id="shopAdd" class="shop-btn">＋ 追加</button>
+          </div>
+        </div>
+        <div class="shop-views">
+          <button data-v="list" class="on">📋 リスト</button>
+          <button data-v="cal">🗓 カレンダー</button>
+        </div>
+        <div id="shopList"></div>
+        <div id="shopCal" class="hidden"></div>
+      </div>
+
+      <div class="card">
+        <h2>🛍 欲しいものリスト <span class="tag">大きい買い物の計画（スプシ連携）</span></h2>
+        <div id="wishList"><div class="note">チャットで「◯◯を欲しいものリストに入れて」と言うとここに貯まります。スプシに「欲しいものリスト」シート（列: 追加日/品名/カテゴリ/推定価格/優先度/状態/メモ・URL）を作ってCSV公開し、⚙設定にURLを入れると表示されます。</div></div>
+      </div>
+    </section>
+
+    <!-- ===== page: study（宅建学習アプリを埋め込み） ===== -->
+    <section id="p-study" class="hidden" style="padding:0">
+      <iframe src="./study/" title="宅建学習アプリ" allow="fullscreen"
+        style="display:block;width:100%;height:84vh;min-height:520px;border:0;border-radius:14px;background:#eef2fb;box-shadow:0 2px 14px rgba(40,60,130,.08)"></iframe>
     </section>
 
     <!-- ===== page: manual ===== -->
@@ -1972,6 +2092,160 @@ function showReport(i){
   const it = window.__reports[i];
   openModal('<h3>📝 '+it.ym+' 月次FPレポート</h3><div class="repbody">'+mdLite(it.body)+'</div>');
 }
+</script>
+
+<script>
+/* ===== 買うものメモ（端末内保存・既存機能とは独立） ===== */
+(function(){
+  const KEY='nishimura_shop_v1';
+  const KINDS={
+    forgot:{l:'買い忘れ',e:'❗',c:'#E85D75'},
+    buy:{l:'買いたい',e:'🛒',c:'#5B67CA'},
+    reserve:{l:'予約',e:'⏰',c:'#8E7CE0'},
+    release:{l:'発売',e:'📦',c:'#43C59E'},
+    plan:{l:'予定',e:'🎉',c:'#F5A623'}
+  };
+  const g=id=>document.getElementById(id);
+  let items=[]; try{items=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){items=[]}
+  let view='list', calDate=new Date();
+  const save=()=>localStorage.setItem(KEY,JSON.stringify(items));
+  const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const WD=['日','月','火','水','木','金','土'];
+  const fmt=d=>{if(!d)return '';const p=d.split('-');return (+p[1])+'/'+(+p[2])+'('+WD[new Date(d+'T00:00').getDay()]+')';};
+  const tstr=()=>{const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');};
+
+  function add(){
+    const name=g('shopName').value.trim(); if(!name)return;
+    items.push({id:'s'+Date.now()+Math.floor(Math.random()*1000),name,kind:g('shopKind').value,date:g('shopDate').value||'',place:g('shopPlace').value.trim(),done:false});
+    save(); g('shopName').value='';g('shopPlace').value='';g('shopDate').value=''; render(); g('shopName').focus();
+  }
+  function itemHTML(it){
+    const k=KINDS[it.kind]||KINDS.buy, meta=[];
+    if(it.date)meta.push('📅 '+fmt(it.date));
+    if(it.place)meta.push('📍 '+esc(it.place));
+    return `<div class="shop-item ${it.done?'done':''}">
+      <div class="si-check ${it.done?'on':''}" onclick="__shop.toggle('${it.id}')">${it.done?'✓':''}</div>
+      <div class="si-body"><div class="si-name">${esc(it.name)}</div>
+      <div class="si-meta"><span class="si-badge" style="background:${k.c}">${k.e}${k.l}</span>${meta.map(m=>'<span>'+m+'</span>').join('')}</div></div>
+      <button class="si-del" onclick="__shop.del('${it.id}')">✕</button></div>`;
+  }
+  function renderList(){
+    const el=g('shopList'); if(!el)return;
+    if(!items.length){el.innerHTML='<div class="shop-empty">まだありません。上の欄から「買うもの・予約・発売日」をどんどん追加！</div>';return;}
+    const act=items.filter(x=>!x.done), done=items.filter(x=>x.done);
+    const dated=act.filter(x=>x.date).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0), un=act.filter(x=>!x.date);
+    let h='';
+    if(dated.length)h+='<div class="shop-group">📅 予定あり（近い順）</div>'+dated.map(itemHTML).join('');
+    if(un.length)h+='<div class="shop-group">🛒 いつか買う</div>'+un.map(itemHTML).join('');
+    if(done.length)h+='<div class="shop-group">✓ 買った・済み（'+done.length+'）</div>'+done.map(itemHTML).join('');
+    el.innerHTML=h;
+  }
+  function renderCal(){
+    const el=g('shopCal'); if(!el)return;
+    const y=calDate.getFullYear(),m=calDate.getMonth();
+    const first=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),today=tstr();
+    let cells='';
+    for(let i=0;i<first;i++)cells+='<div></div>';
+    for(let d=1;d<=dim;d++){
+      const ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      const evs=items.filter(x=>x.date===ds);
+      cells+=`<div class="cal-d ${ds===today?'today':''}"><div class="cal-dn">${d}</div>`+
+        evs.slice(0,3).map(e=>{const k=KINDS[e.kind]||KINDS.buy;return `<div class="cal-ev" style="background:${k.c}">${k.e}${esc(e.name)}</div>`}).join('')+
+        (evs.length>3?`<div style="font-size:9px;color:var(--dim)">+${evs.length-3}</div>`:'')+`</div>`;
+    }
+    el.innerHTML=`<div class="cal-head"><button class="cal-nav" onclick="__shop.cal(-1)">‹</button><b>${y}年 ${m+1}月</b><button class="cal-nav" onclick="__shop.cal(1)">›</button></div>`+
+      `<div class="cal-grid">`+WD.map(w=>`<div class="cal-wd">${w}</div>`).join('')+cells+`</div>`;
+  }
+  function render(){
+    if(!g('shopList'))return;
+    if(view==='list'){g('shopList').classList.remove('hidden');g('shopCal').classList.add('hidden');renderList();}
+    else{g('shopList').classList.add('hidden');g('shopCal').classList.remove('hidden');renderCal();}
+  }
+  window.__shop={
+    toggle:id=>{const it=items.find(x=>x.id===id);if(it){it.done=!it.done;save();render();}},
+    del:id=>{items=items.filter(x=>x.id!==id);save();render();},
+    cal:n=>{calDate.setMonth(calDate.getMonth()+n);renderCal();}
+  };
+  function init(){
+    if(!g('shopKind'))return;
+    g('shopKind').innerHTML=Object.entries(KINDS).map(([k,v])=>`<option value="${k}">${v.e} ${v.l}</option>`).join('');
+    g('shopKind').value='buy';
+    g('shopAdd').addEventListener('click',add);
+    g('shopName').addEventListener('keydown',e=>{if(e.key==='Enter')add();});
+    document.querySelectorAll('#p-shop .shop-views button').forEach(b=>b.addEventListener('click',()=>{view=b.dataset.v;document.querySelectorAll('#p-shop .shop-views button').forEach(x=>x.classList.toggle('on',x===b));render();}));
+    render();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+
+<script>
+/* ===== 今日のダッシュボード（買うもの＋勉強の毎日更新分をまとめ表示） ===== */
+(function(){
+  const g=id=>document.getElementById(id);
+  const SHOP='nishimura_shop_v1', TAK='takken_v1';
+  const KINDS={forgot:{e:'❗',c:'#E85D75'},buy:{e:'🛒',c:'#5B67CA'},reserve:{e:'⏰',c:'#8E7CE0'},release:{e:'📦',c:'#43C59E'},plan:{e:'🎉',c:'#F5A623'}};
+  const WD=['日','月','火','水','木','金','土'];
+  const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const tstr=d=>{d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  const shop=()=>{try{return JSON.parse(localStorage.getItem(SHOP))||[]}catch(e){return[]}};
+  const saveShop=a=>localStorage.setItem(SHOP,JSON.stringify(a));
+  const tak=()=>{try{return JSON.parse(localStorage.getItem(TAK))}catch(e){return null}};
+
+  function studyInfo(){
+    const s=tak(); const goal=(s&&s.set&&s.set.goalQ)||10;
+    if(!s||!s.log) return {done:0,goal,streak:0,started:false};
+    const t=s.log[tstr()]||{ans:0};
+    let n=0,d=new Date();
+    if(!(s.log[tstr(d)]&&s.log[tstr(d)].ans>0)) d.setDate(d.getDate()-1);
+    for(;;){const k=tstr(d); if(s.log[k]&&s.log[k].ans>0){n++;d.setDate(d.getDate()-1);}else break;}
+    return {done:t.ans||0,goal,streak:n,started:true};
+  }
+  function taskHTML(it){
+    const k=KINDS[it.kind]||KINDS.buy, od=it.date&&it.date<tstr()&&!it.done;
+    return `<div class="tk-item ${it.done?'done':''}">
+      <div class="tk-check ${it.done?'on':''}" onclick="__today.toggle('${it.id}')">${it.done?'✓':''}</div>
+      <div class="tk-body"><span class="tk-badge" style="background:${k.c}">${k.e}</span>
+        <span class="tk-name">${esc(it.name)}</span>
+        ${od?'<span class="tk-od">期限すぎ</span>':''}
+        ${it.place?`<span class="tk-meta">📍${esc(it.place)}</span>`:''}</div></div>`;
+  }
+  function todayItems(){
+    const t=tstr();
+    return shop().filter(x=>!x.done&&(x.date===t||(x.date&&x.date<t)||(!x.date&&x.kind==='forgot')))
+      .sort((a,b)=>(a.date||'9999')<(b.date||'9999')?-1:1);
+  }
+  function penguin(items, si){
+    const P=window.PENG||{};
+    if(items.some(t=>t.kind==='release'||t.kind==='reserve')) return {img:P.good,msg:'今日は発売・予約の日！忘れずチェック📦'};
+    if(si.started&&si.done>=si.goal) return {img:P.good,msg:`勉強の目標クリア！えらい🎉 ${si.streak?'連続'+si.streak+'日':''}`};
+    if(items.some(t=>t.kind==='forgot')) return {img:P.sweat,msg:'買い忘れ、今日のうちに片付けちゃおう'};
+    if(si.streak>=3) return {img:P.def,msg:`${si.streak}日連続、いい調子🔥 今日も少しずつ`};
+    if(items.length) return {img:P.def,msg:'今日やること、上からサクッと片付けよう👇'};
+    return {img:P.eat||P.def,msg:'今日は予定なし。ゆっくりいこう☕️'};
+  }
+  function render(){
+    if(!g('todayTasks'))return;
+    const now=new Date();
+    g('todayDate').textContent=`${now.getMonth()+1}月${now.getDate()}日(${WD[now.getDay()]})`;
+    const items=todayItems();
+    g('todayTasks').innerHTML=items.length?items.map(taskHTML).join(''):'<div class="tk-empty">今日やることは無し。ゆっくりいこう☕️</div>';
+    g('todayCount').textContent=items.length?items.length+'件':'なし';
+    const si=studyInfo();
+    g('todayStudy').innerHTML=si.done>=si.goal&&si.started?`✅ ${si.done}/${si.goal}問`:`${si.done}/${si.goal}問${si.streak?` 🔥${si.streak}`:''}`;
+    const p=penguin(items,si);
+    if(p.img)g('todayPeng').src=p.img;
+    g('todayMsg').textContent=p.msg;
+  }
+  window.__today={
+    toggle:id=>{const a=shop();const it=a.find(x=>x.id===id);if(it){it.done=!it.done;saveShop(a);render();}},
+    go:pg=>{const n=document.querySelector('.navitem[data-page="'+pg+'"]');if(n)n.click();}
+  };
+  function init(){ if(!g('todayTasks'))return; render();
+    const nav=document.querySelector('.navitem[data-page="p-today"]'); if(nav)nav.addEventListener('click',render);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
 </script>
 
 <script>

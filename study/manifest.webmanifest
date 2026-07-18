@@ -1,0 +1,17 @@
+{
+  "name": "宅建合格 2026",
+  "short_name": "宅建合格",
+  "description": "宅地建物取引士2026 学習アプリ（過去問・一問一答・苦手ノート・学習記録）",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef2fb",
+  "theme_color": "#3d5afe",
+  "lang": "ja",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
