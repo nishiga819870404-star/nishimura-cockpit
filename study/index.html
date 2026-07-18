@@ -427,10 +427,41 @@ window.MASCOT={"study": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQQAAADQC
 
 </script>
 <script>
+/* 講義動画リンク（自動生成: build.py ← data/videos.json）。Drive非公開・本人ログインでのみ再生可 */
+window.VIDEOS = {"宅建業法": [{"n": "01", "label": "宅建業法入門①", "ch": "1", "id": "1wCI1HgM-gPbe5aqTg6jWZkOR091SZyE3"}, {"n": "03", "label": "業務に対する規制①", "ch": "2", "id": "1H3BKh9_T6Iso3bI0Xx9wjTNN679KR4DI"}, {"n": "04", "label": "業務に対する規制②", "ch": "2", "id": "1aYQXlUOtAGUAR5Tx87Xa7yxmLswIC2n0"}, {"n": "05", "label": "業務に対する規制③", "ch": "2", "id": "1iAO6H0ThTxalkrLud4F1qwS0eHtkR8uZ"}, {"n": "06", "label": "業務に対する規制④", "ch": "2", "id": "1atUgE8qZTlFZHAsMlATM-92tfuku7jnN"}, {"n": "07", "label": "業務に対する規制⑤", "ch": "2", "id": "1vfHfdLNl-cDCkq1oWr83Yo7VXOSIAOXR"}, {"n": "09", "label": "業務に対する規制⑦", "ch": "2", "id": "17MSHvlsWDe6m_qa7Ce_7xw4CV-aQwKqk"}, {"n": "10", "label": "業務に対する規制⑧", "ch": "2", "id": "1leUa5XiJhw2De6fm8E1kICVbzF0KGBPk"}, {"n": "11", "label": "業務に対する規制⑨", "ch": "2", "id": "1f1263M38jMYZbcrxS4FHkuB-ZqTwlNsL"}, {"n": "12", "label": "業務に対する規制⑩", "ch": "2", "id": "1Omw0UQ-kOvG2EKBQH7IfrivPb6lpDcSt"}, {"n": "13", "label": "業務に対する規制⑪", "ch": "2", "id": "1qjysyzNy1zkAqjxfKatQpFcDanbacrIz"}, {"n": "14", "label": "業務に対する規制⑫", "ch": "2", "id": "1D0Op7TDK_62nGUiVF726IvKST_LWfOc8"}, {"n": "15", "label": "業務に対する規制⑬", "ch": "2", "id": "1zFjnB9h2htOgK-Kc7ukENQj6ZzqJfwr-"}, {"n": "16", "label": "業者についての免許制度①", "ch": "3", "id": "1KGsvbRYH66wgbNK7cO3cInGWMeFo_5_n"}, {"n": "17", "label": "業者についての免許制度②", "ch": "3", "id": "1CLecdupehGk2YlTud44uRVOrBLgyqCaR"}, {"n": "18", "label": "業者についての免許制度③", "ch": "3", "id": "1Kzmdx-ZfB3VLIwEXJMnZJqt35HTWJ9CT"}, {"n": "19", "label": "業者についての免許制度④", "ch": "3", "id": "12RecNqiaOfOpOO7eYSjVszyin-81sHso"}, {"n": "20", "label": "業者についての免許制度⑤", "ch": "3", "id": "198DCVYXIc7NCe0puSGy6l2CP7Q_RBXnq"}, {"n": "21", "label": "宅建士制度①", "ch": "4", "id": "19n1QhdoortlgbKaeOJZ1ebjk9x7UHYn1"}, {"n": "22", "label": "宅建士制度②", "ch": "4", "id": "1sAvxeDhCN7tf1HGVTWpfRxSYAU8Crtak"}, {"n": "23", "label": "監督・罰則", "ch": "5", "id": "1QaNTtngs3OuFOdPxe8fjUBXlbnouEUy2"}]};
+
+</script>
+<script>
 /* ============ 起動時フォールバック ============ */
 if(!window.SAMPLE_QUESTIONS){ window.SAMPLE_QUESTIONS = []; }
 if(!window.COURSE){ window.COURSE = {curriculum:[], reading:{}, questions:[]}; }
 if(!window.MASCOT){ window.MASCOT = {}; }
+if(!window.VIDEOS){ window.VIDEOS = {}; }
+/* 講義動画（Googleドライブ・非公開）。章番号(ch)で要点と紐づく */
+function vidsFor(subject, chapterNo){
+  const ch = String(chapterNo).split("-")[0];
+  return (window.VIDEOS[subject]||[]).filter(v=>v.ch===ch);
+}
+function vidUrl(v){ return "https://drive.google.com/file/d/"+v.id+"/view"; }
+/* 問題のtopicから最も近い「要点の章」を探す（復習リンク用） */
+function findChapterByTopic(subject, topic){
+  const chs = readingOf(subject); if(!chs.length||!topic) return null;
+  let best=null, bestScore=0;
+  for(const c of chs){
+    let s=0;
+    if(c.title===topic) s=100;
+    else if(c.title.indexOf(topic)>=0) s=60+topic.length;
+    else if(topic.indexOf(c.title)>=0) s=50+c.title.length;
+    else{
+      // トークン一致（2文字以上の共通部分文字列をざっくり評価）
+      for(let i=0;i<topic.length-1;i++){ const bi=topic.slice(i,i+2); if(c.title.indexOf(bi)>=0) s+=3; }
+      // 要点本文にも topic が出てくれば加点
+      if((c.points||[]).some(p=>p.indexOf(topic)>=0)) s+=8;
+    }
+    if(s>bestScore){ bestScore=s; best=c; }
+  }
+  return bestScore>=8 ? best : null;
+}
 /* ペンギンマスコット画像。無ければ絵文字にフォールバック */
 function mascot(name,size,emoji){
   if(window.MASCOT&&window.MASCOT[name]) return `<img src="${window.MASCOT[name]}" alt="" style="width:${size||100}px;height:auto;display:block;image-rendering:auto">`;
@@ -456,7 +487,12 @@ const clsOf = s => (SUBJECTS.find(x=>x.key===s)||{}).cls || "s-gyo";
 /* ============ 状態（localStorage） ============ */
 const LS="takken_v1";
 let S = load();
-if(!S.read) S.read={};   // 章の既読フラグ
+/* 欠けているキーを補完（部分データや旧バージョンからの移行でも壊れないように） */
+if(!S.p) S.p={};
+if(!S.log) S.log={};
+if(!S.custom) S.custom=[];
+if(!S.read) S.read={};
+if(!S.set) S.set={exam:EXAM_DATE_DEFAULT, goalQ:10};
 function load(){
   try{ return JSON.parse(localStorage.getItem(LS)) || fresh(); }catch(e){ return fresh(); }
 }
@@ -696,6 +732,10 @@ function viewChapter(){
         <span style="font-size:15px">${esc(p)}</span></div>`).join("")||'<div class="mut">要点データがありません。</div>'}
       <button class="btn ${done?'sec':''}" style="margin-top:8px" onclick="toggleReadCh('${sub}','${(''+no).replace(/'/g,"")}')">${done?'✓ 読了済み（タップで戻す）':'読んだ ✓'}</button>
     </div>
+    ${(()=>{const vs=vidsFor(sub,no); if(!vs.length)return '';
+      return `<div class="card"><h3 style="font-size:14px;margin-bottom:8px">🎬 この章の講義動画 <span class="pill">${vs.length}本</span></h3>
+      ${vs.map(v=>`<a href="${vidUrl(v)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:9px;padding:10px 4px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--ink);font-weight:600;font-size:14px"><span style="color:var(--pri)">▶</span> ${esc(v.n)} ${esc(v.label)}<span class="mut" style="margin-left:auto;font-size:11px">Drive</span></a>`).join("")}
+      <div class="mut" style="font-size:11px;margin-top:8px">あなたのGoogleドライブで再生されます（非公開）</div></div>`;})()}
     <div class="grid2">
       ${idx>0?`<button class="btn sec" onclick="openChapter('${sub}','${(''+chs[idx-1].no).replace(/'/g,"")}')">‹ 前の要点</button>`:'<div></div>'}
       ${idx<chs.length-1?`<button class="btn sec" onclick="openChapter('${sub}','${(''+chs[idx+1].no).replace(/'/g,"")}')">次の要点 ›</button>`:`<button class="btn" onclick="startQuiz({subject:'${sub}',onlyKako:true})">過去問へ →</button>`}
@@ -789,10 +829,24 @@ function viewQuiz(){
   let expl="";
   if(Q.answered){
     const ok=(q.type==="ox"? Q.chosen===q.answer : Q.chosen===q.answer);
+    let review='';
+    if(!ok){
+      const rc=findChapterByTopic(q.subject,q.topic);
+      const vs=rc?vidsFor(q.subject,rc.no):[];
+      if(rc||vs.length){
+        review=`<div style="background:#fff6ec;border:1px solid #ffe3c4;border-radius:12px;padding:12px 14px;margin-top:10px">
+          <div style="font-weight:800;font-size:13px;color:#b5641a;margin-bottom:8px">🔁 弱点つぶし — ここで復習</div>
+          ${rc?`<button class="btn sm sec" style="width:100%;text-align:left;margin-bottom:6px" onclick="reviewChapter('${q.subject}','${(''+rc.no).replace(/'/g,"")}')">📖 要点『${esc(rc.title)}』${rc.page?'（テキストP'+rc.page+'）':''}</button>`:''}
+          ${vs.slice(0,2).map(v=>`<a href="${vidUrl(v)}" target="_blank" rel="noopener" class="btn sm sec" style="display:block;width:100%;text-align:left;margin-bottom:6px;text-decoration:none">▶ 動画『${esc(v.label)}』</a>`).join("")}
+          ${vs.length>2?`<div class="mut" style="font-size:11px">ほか${vs.length-2}本は要点ページから</div>`:''}
+        </div>`;
+      }
+    }
     expl=`${ok?`<div style="text-align:center;margin-top:10px;animation:pop .35s">${mascot('cheer',104,'🎉')}</div>`:''}
       <div class="expl">
       <div class="judge ${ok?'ok':'ng'}">${ok?'◯ 正解！':'✕ 不正解'}${q.type==='ox'?'（正答：'+(q.answer?'◯':'✕')+'）':''}</div>
       ${esc(q.exp)}</div>
+      ${review}
       <button class="btn" style="margin-top:14px" onclick="next()">${Q.i+1<Q.list.length?'次の問題 →':'結果を見る'}</button>`;
   }
   return `<div class="wrap">
@@ -853,6 +907,7 @@ function showResult(){
   QUIZ=null; window.scrollTo(0,0);
 }
 function toggleMark(id){ const st=pg(id); st.mark=!st.mark; save(); render(); toast(st.mark?"⭐️ チェックしました":"チェック解除"); }
+function reviewChapter(sub,no){ QUIZ=null; TAB='learn'; LEARN.sub=sub; LEARN.ch={sub,no}; window.scrollTo(0,0); render(); }
 
 /* ============ 苦手 ============ */
 function viewWeak(){
