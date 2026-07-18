@@ -2095,9 +2095,16 @@ function showReport(i){
 </script>
 
 <script>
-/* ===== 買うものメモ（端末内保存・既存機能とは独立） ===== */
+/* ===== yotei.json（Claude経由の同期予定。リポジトリ直コミット→全端末に配信） ===== */
+window.__yotei = fetch('./yotei.json?ts='+Date.now())
+  .then(r=>r.ok?r.json():{items:[]})
+  .catch(()=>({items:[]}));
+</script>
+<script>
+/* ===== 買うものメモ（端末内保存 + yotei.json同期分をマージ） ===== */
 (function(){
   const KEY='nishimura_shop_v1';
+  const RDONE_KEY='nishimura_shop_rdone';
   const KINDS={
     forgot:{l:'買い忘れ',e:'❗',c:'#E85D75'},
     buy:{l:'買いたい',e:'🛒',c:'#5B67CA'},
@@ -2107,8 +2114,13 @@ function showReport(i){
   };
   const g=id=>document.getElementById(id);
   let items=[]; try{items=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){items=[]}
+  let REMOTE=[]; let RDONE={}; try{RDONE=JSON.parse(localStorage.getItem(RDONE_KEY))||{}}catch(e){RDONE={}}
   let view='list', calDate=new Date();
   const save=()=>localStorage.setItem(KEY,JSON.stringify(items));
+  const saveR=()=>localStorage.setItem(RDONE_KEY,JSON.stringify(RDONE));
+  // 同期分（yotei.json）をローカル形式に変換。id は r- 接頭辞、doneは端末側オーバーレイ
+  const remoteView=()=>REMOTE.map(x=>({id:'r-'+x.id,name:x.name,kind:x.kind||'plan',date:x.date||'',place:x.place||'',done:!!RDONE['r-'+x.id],remote:true}));
+  const allItems=()=>items.concat(remoteView());
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const WD=['日','月','火','水','木','金','土'];
   const fmt=d=>{if(!d)return '';const p=d.split('-');return (+p[1])+'/'+(+p[2])+'('+WD[new Date(d+'T00:00').getDay()]+')';};
@@ -2123,16 +2135,18 @@ function showReport(i){
     const k=KINDS[it.kind]||KINDS.buy, meta=[];
     if(it.date)meta.push('📅 '+fmt(it.date));
     if(it.place)meta.push('📍 '+esc(it.place));
+    if(it.remote)meta.push('☁️ 同期');
     return `<div class="shop-item ${it.done?'done':''}">
       <div class="si-check ${it.done?'on':''}" onclick="__shop.toggle('${it.id}')">${it.done?'✓':''}</div>
       <div class="si-body"><div class="si-name">${esc(it.name)}</div>
       <div class="si-meta"><span class="si-badge" style="background:${k.c}">${k.e}${k.l}</span>${meta.map(m=>'<span>'+m+'</span>').join('')}</div></div>
-      <button class="si-del" onclick="__shop.del('${it.id}')">✕</button></div>`;
+      ${it.remote?'':`<button class="si-del" onclick="__shop.del('${it.id}')">✕</button>`}</div>`;
   }
   function renderList(){
     const el=g('shopList'); if(!el)return;
-    if(!items.length){el.innerHTML='<div class="shop-empty">まだありません。上の欄から「買うもの・予約・発売日」をどんどん追加！</div>';return;}
-    const act=items.filter(x=>!x.done), done=items.filter(x=>x.done);
+    const A=allItems();
+    if(!A.length){el.innerHTML='<div class="shop-empty">まだありません。上の欄から「買うもの・予約・発売日」をどんどん追加！<br>Claudeに「◯◯を予定に入れといて」と言ってもここに届きます☁️</div>';return;}
+    const act=A.filter(x=>!x.done), done=A.filter(x=>x.done);
     const dated=act.filter(x=>x.date).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0), un=act.filter(x=>!x.date);
     let h='';
     if(dated.length)h+='<div class="shop-group">📅 予定あり（近い順）</div>'+dated.map(itemHTML).join('');
@@ -2148,7 +2162,7 @@ function showReport(i){
     for(let i=0;i<first;i++)cells+='<div></div>';
     for(let d=1;d<=dim;d++){
       const ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-      const evs=items.filter(x=>x.date===ds);
+      const evs=allItems().filter(x=>x.date===ds);
       cells+=`<div class="cal-d ${ds===today?'today':''}"><div class="cal-dn">${d}</div>`+
         evs.slice(0,3).map(e=>{const k=KINDS[e.kind]||KINDS.buy;return `<div class="cal-ev" style="background:${k.c}">${k.e}${esc(e.name)}</div>`}).join('')+
         (evs.length>3?`<div style="font-size:9px;color:var(--dim)">+${evs.length-3}</div>`:'')+`</div>`;
@@ -2162,7 +2176,9 @@ function showReport(i){
     else{g('shopList').classList.add('hidden');g('shopCal').classList.remove('hidden');renderCal();}
   }
   window.__shop={
-    toggle:id=>{const it=items.find(x=>x.id===id);if(it){it.done=!it.done;save();render();}},
+    toggle:id=>{
+      if(id.indexOf('r-')===0){ if(RDONE[id])delete RDONE[id]; else RDONE[id]=1; saveR(); render(); return; }
+      const it=items.find(x=>x.id===id);if(it){it.done=!it.done;save();render();}},
     del:id=>{items=items.filter(x=>x.id!==id);save();render();},
     cal:n=>{calDate.setMonth(calDate.getMonth()+n);renderCal();}
   };
@@ -2174,6 +2190,7 @@ function showReport(i){
     g('shopName').addEventListener('keydown',e=>{if(e.key==='Enter')add();});
     document.querySelectorAll('#p-shop .shop-views button').forEach(b=>b.addEventListener('click',()=>{view=b.dataset.v;document.querySelectorAll('#p-shop .shop-views button').forEach(x=>x.classList.toggle('on',x===b));render();}));
     render();
+    if(window.__yotei)window.__yotei.then(j=>{REMOTE=(j&&j.items)||[];render();});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
@@ -2191,6 +2208,10 @@ function showReport(i){
   const shop=()=>{try{return JSON.parse(localStorage.getItem(SHOP))||[]}catch(e){return[]}};
   const saveShop=a=>localStorage.setItem(SHOP,JSON.stringify(a));
   const tak=()=>{try{return JSON.parse(localStorage.getItem(TAK))}catch(e){return null}};
+  const RDONE_KEY='nishimura_shop_rdone';
+  let REMOTE=[];
+  const rdone=()=>{try{return JSON.parse(localStorage.getItem(RDONE_KEY))||{}}catch(e){return{}}};
+  const shopAll=()=>{const rd=rdone();return shop().concat(REMOTE.map(x=>({id:'r-'+x.id,name:x.name,kind:x.kind||'plan',date:x.date||'',place:x.place||'',done:!!rd['r-'+x.id],remote:true})));};
 
   function studyInfo(){
     const s=tak(); const goal=(s&&s.set&&s.set.goalQ)||10;
@@ -2212,7 +2233,7 @@ function showReport(i){
   }
   function todayItems(){
     const t=tstr();
-    return shop().filter(x=>!x.done&&(x.date===t||(x.date&&x.date<t)||(!x.date&&x.kind==='forgot')))
+    return shopAll().filter(x=>!x.done&&(x.date===t||(x.date&&x.date<t)||(!x.date&&x.kind==='forgot')))
       .sort((a,b)=>(a.date||'9999')<(b.date||'9999')?-1:1);
   }
   function penguin(items, si){
@@ -2238,11 +2259,14 @@ function showReport(i){
     g('todayMsg').textContent=p.msg;
   }
   window.__today={
-    toggle:id=>{const a=shop();const it=a.find(x=>x.id===id);if(it){it.done=!it.done;saveShop(a);render();}},
+    toggle:id=>{
+      if(id.indexOf('r-')===0){const rd=rdone(); if(rd[id])delete rd[id]; else rd[id]=1; localStorage.setItem(RDONE_KEY,JSON.stringify(rd)); render(); return;}
+      const a=shop();const it=a.find(x=>x.id===id);if(it){it.done=!it.done;saveShop(a);render();}},
     go:pg=>{const n=document.querySelector('.navitem[data-page="'+pg+'"]');if(n)n.click();}
   };
   function init(){ if(!g('todayTasks'))return; render();
     const nav=document.querySelector('.navitem[data-page="p-today"]'); if(nav)nav.addEventListener('click',render);
+    if(window.__yotei)window.__yotei.then(j=>{REMOTE=(j&&j.items)||[];render();});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
