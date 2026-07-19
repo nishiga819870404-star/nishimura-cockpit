@@ -1,6 +1,6 @@
-/* 宅建合格（配信版）SW — build.pyがf15da6d277を本体ハッシュで置換する。
+/* 宅建合格（配信版）SW — build.pyが3d6a084c2aを本体ハッシュで置換する。
    index.htmlは【ネットワーク優先】= 更新が即反映。オフライン時のみキャッシュで起動。 */
-const CACHE = "takken-app-f15da6d277";
+const CACHE = "takken-app-3d6a084c2a";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-512.png", "./apple-touch-icon.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
