@@ -119,6 +119,15 @@ label{font-size:13px;font-weight:700;color:var(--sub);display:block;margin:10px 
 .toast.show{opacity:1}
 .hero-btn{background:linear-gradient(135deg,var(--pri),var(--pri2));box-shadow:0 8px 22px rgba(61,90,254,.38)}
 .msg{background:linear-gradient(135deg,#fff6ec,#fff);border:1px solid #ffe3c4;border-radius:14px;padding:12px 14px;margin-bottom:12px;font-size:14px;font-weight:700;color:#b5641a;display:flex;gap:9px;align-items:center;box-shadow:var(--sh)}
+.vmodal{position:fixed;inset:0;background:rgba(10,14,30,.85);z-index:80;display:flex;align-items:center;justify-content:center;padding:10px}
+.vbox{background:#000;border-radius:14px;overflow:hidden;width:100%;max-width:720px}
+.vhead{display:flex;align-items:center;gap:10px;background:var(--card);padding:10px 14px}
+.vhead b{flex:1;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vhead a{font-size:12px;font-weight:700;white-space:nowrap}
+.vhead button{background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-weight:800}
+.vbox iframe{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000}
+.vrow{width:100%;text-align:left;background:var(--card2);border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;font-size:14px;font-weight:700;display:flex;gap:10px;align-items:center;color:var(--ink)}
+.vrow .p{color:var(--pri);flex:0 0 auto}
 a{color:var(--pri)}
 </style>
 
@@ -449,6 +458,38 @@ function vidsFor(subject, chapterNo){
   return (window.VIDEOS[subject]||[]).filter(v=>v.ch===ch);
 }
 function vidUrl(v){ return "https://drive.google.com/file/d/"+v.id+"/view"; }
+/* アプリ内プレーヤー（Drive埋め込み）。再生できない環境向けに「Driveで開く」も常設 */
+function playVid(id,label){
+  const old=document.getElementById('vmodal'); if(old)old.remove();
+  const w=document.createElement('div'); w.className='vmodal'; w.id='vmodal';
+  w.onclick=e=>{ if(e.target===w) w.remove(); };
+  w.innerHTML=`<div class="vbox"><div class="vhead"><b>${esc(label||'講義動画')}</b>
+    <a href="https://drive.google.com/file/d/${id}/view" target="_blank" rel="noopener">Driveで開く</a>
+    <button onclick="document.getElementById('vmodal').remove()">✕</button></div>
+    <iframe src="https://drive.google.com/file/d/${id}/preview" allow="autoplay; fullscreen" allowfullscreen></iframe></div>`;
+  document.body.appendChild(w);
+}
+const DRIVE_FOLDER="https://drive.google.com/drive/folders/1aglXS3JkJAwjp8VG35_QNr7e998G7PLV";
+/* 動画ライブラリ（全動画へのダイレクトアクセス） */
+function viewMedia(){
+  const subs=Object.keys(window.VIDEOS||{});
+  return `<div class="wrap">
+    <div class="between top"><span class="app">🎬 動画ライブラリ</span><button class="pill" onclick="go('learn')">‹ コース</button></div>
+    <div class="card" style="padding:13px 15px">
+      <div class="sub" style="font-size:13px;margin-bottom:10px">タップでそのまま再生されます（あなたのドライブ・非公開）。過去問の解説動画は、問題を解いた画面の「🎬この問題の講師解説動画」から。</div>
+      <a class="btn sm sec" style="display:block;text-align:center;text-decoration:none" href="${DRIVE_FOLDER}" target="_blank" rel="noopener">📁 ドライブの宅建フォルダを直接開く</a>
+    </div>
+    ${subs.map(sub=>{
+      const vs=(window.VIDEOS[sub]||[]);
+      const chs={}; vs.forEach(v=>{(chs[v.ch]=chs[v.ch]||[]).push(v)});
+      return `<div class="card">
+        <div class="row" style="margin-bottom:8px"><span class="dot ${clsOf(sub)}"></span><b>${sub}</b><span class="pill" style="margin-left:auto">${vs.length}本</span></div>
+        ${Object.keys(chs).sort().map(ch=>`<div class="shop-group" style="font-size:12px;font-weight:800;color:var(--sub);margin:10px 0 4px">${ch}章</div>`+
+          chs[ch].map(v=>`<button class="vrow" onclick="playVid('${v.id}','${esc(v.label)}')"><span class="p">▶</span><span>${esc(v.n)} ${esc(v.label)}</span></button>`).join("")).join("")}
+      </div>`;}).join("")}
+    <div style="height:20px"></div>
+  </div>`;
+}
 /* 問題のtopicから最も近い「要点の章」を探す（復習リンク用） */
 function findChapterByTopic(subject, topic){
   const chs = readingOf(subject); if(!chs.length||!topic) return null;
@@ -558,7 +599,7 @@ function render(){
   renderNav();
   const el=document.getElementById("screen");
   if(QUIZ){ el.innerHTML=viewQuiz(); return; }
-  el.innerHTML = ({home:viewHome,learn:viewLearn,quiz:viewQuizMenu,weak:viewWeak,record:viewRecord,settings:viewSettings,help:viewHelp})[TAB]();
+  el.innerHTML = ({home:viewHome,learn:viewLearn,quiz:viewQuizMenu,weak:viewWeak,record:viewRecord,settings:viewSettings,help:viewHelp,media:viewMedia})[TAB]();
   if(TAB==="learn"&&!LEARN.ch) mountLearn();
 }
 
@@ -676,6 +717,7 @@ function viewLearn(){
   return `<div class="wrap">
     <div class="top"><span class="app">コース（学習の順番）</span></div>
     <div class="card" style="padding:13px 15px"><div class="sub" style="font-size:13px">受講ガイド推奨の流れで並べています。各科目は<b style="color:var(--ink)">要点を読む → 過去問で確認</b>。業法→法令→税その他→権利の順で。</div></div>
+    <button class="btn sec" style="margin-bottom:12px;border-color:var(--pri);color:var(--pri)" onclick="go('media')">🎬 動画ライブラリ（全${Object.values(window.VIDEOS||{}).reduce((a,v)=>a+v.length,0)}本をここから直接再生）</button>
     ${curList().map((step,i)=>renderStep(step,i,all)).join("")}
     <div class="card">
       <div class="between"><h3 style="font-size:15px">🎬 講義動画</h3><button class="btn sm sec" onclick="pickVideo()">取込</button></div>
@@ -740,8 +782,8 @@ function viewChapter(){
     </div>
     ${(()=>{const vs=vidsFor(sub,no); if(!vs.length)return '';
       return `<div class="card"><h3 style="font-size:14px;margin-bottom:8px">🎬 この章の講義動画 <span class="pill">${vs.length}本</span></h3>
-      ${vs.map(v=>`<a href="${vidUrl(v)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:9px;padding:10px 4px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--ink);font-weight:600;font-size:14px"><span style="color:var(--pri)">▶</span> ${esc(v.n)} ${esc(v.label)}<span class="mut" style="margin-left:auto;font-size:11px">Drive</span></a>`).join("")}
-      <div class="mut" style="font-size:11px;margin-top:8px">あなたのGoogleドライブで再生されます（非公開）</div></div>`;})()}
+      ${vs.map(v=>`<button class="vrow" onclick="playVid('${v.id}','${esc(v.label)}')"><span class="p">▶</span><span>${esc(v.n)} ${esc(v.label)}</span></button>`).join("")}
+      <div class="mut" style="font-size:11px;margin-top:6px">タップでその場で再生（あなたのドライブ・非公開）</div></div>`;})()}
     <div class="grid2">
       ${idx>0?`<button class="btn sec" onclick="openChapter('${sub}','${(''+chs[idx-1].no).replace(/'/g,"")}')">‹ 前の要点</button>`:'<div></div>'}
       ${idx<chs.length-1?`<button class="btn sec" onclick="openChapter('${sub}','${(''+chs[idx+1].no).replace(/'/g,"")}')">次の要点 ›</button>`:`<button class="btn" onclick="startQuiz({subject:'${sub}',onlyKako:true})">過去問へ →</button>`}
@@ -843,7 +885,7 @@ function viewQuiz(){
         review=`<div style="background:#fff6ec;border:1px solid #ffe3c4;border-radius:12px;padding:12px 14px;margin-top:10px">
           <div style="font-weight:800;font-size:13px;color:#b5641a;margin-bottom:8px">🔁 弱点つぶし — ここで復習</div>
           ${rc?`<button class="btn sm sec" style="width:100%;text-align:left;margin-bottom:6px" onclick="reviewChapter('${q.subject}','${(''+rc.no).replace(/'/g,"")}')">📖 要点『${esc(rc.title)}』${rc.page?'（テキストP'+rc.page+'）':''}</button>`:''}
-          ${vs.slice(0,2).map(v=>`<a href="${vidUrl(v)}" target="_blank" rel="noopener" class="btn sm sec" style="display:block;width:100%;text-align:left;margin-bottom:6px;text-decoration:none">▶ 動画『${esc(v.label)}』</a>`).join("")}
+          ${vs.slice(0,2).map(v=>`<button class="btn sm sec" style="display:block;width:100%;text-align:left;margin-bottom:6px" onclick="playVid('${v.id}','${esc(v.label)}')">▶ 動画『${esc(v.label)}』</button>`).join("")}
           ${vs.length>2?`<div class="mut" style="font-size:11px">ほか${vs.length-2}本は要点ページから</div>`:''}
         </div>`;
       }
@@ -853,7 +895,7 @@ function viewQuiz(){
       <div class="expl">
       <div class="judge ${ok?'ok':'ng'}">${ok?'◯ 正解！':'✕ 不正解'}${q.type==='ox'?'（正答：'+(q.answer?'◯':'✕')+'）':''}</div>
       ${esc(q.exp)}</div>
-      ${qv?`<a href="https://drive.google.com/file/d/${qv}/view" target="_blank" rel="noopener" class="btn sm sec" style="display:block;margin-top:10px;text-align:left;text-decoration:none;border-color:var(--pri);color:var(--pri);font-weight:800">🎬 この問題の講師解説動画を見る</a>`:''}
+      ${qv?`<button class="btn sm sec" style="display:block;width:100%;margin-top:10px;text-align:left;border-color:var(--pri);color:var(--pri);font-weight:800" onclick="playVid('${qv}','この問題の講師解説')">🎬 この問題の講師解説動画を見る</button>`:''}
       ${review}
       <button class="btn" style="margin-top:14px" onclick="next()">${Q.i+1<Q.list.length?'次の問題 →':'結果を見る'}</button>`;
   }
