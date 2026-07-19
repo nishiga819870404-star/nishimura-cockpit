@@ -1,6 +1,61 @@
 {
-  "updated": "2026-07-18",
-  "items": [
-    {"id": "20260718-toystory", "date": "2026-07-18", "name": "トイストーリー映画いく", "kind": "plan", "place": "イオン幕張"}
-  ]
+ "updated": "2026-07-19",
+ "items": [
+  {
+   "id": "20260718-toystory",
+   "date": "2026-07-18",
+   "name": "トイストーリー映画いく",
+   "kind": "plan",
+   "place": "イオン幕張"
+  },
+  {
+   "id": "20260719-disney-on-ice",
+   "date": "2026-07-19",
+   "name": "ディズニー・オン・アイス",
+   "kind": "plan",
+   "place": "17:00〜19:00"
+  },
+  {
+   "id": "20260720-kaimono-list",
+   "date": "2026-07-20",
+   "name": "買い物（納豆・豆腐・部屋消臭剤2・トイレクイックル・トイレ消臭剤・玄関消臭剤・トイレスタンプ・餅・パックご飯・風呂洗剤）",
+   "kind": "buy",
+   "place": "9:00リスト確認"
+  },
+  {
+   "id": "20260720-welcia",
+   "date": "2026-07-20",
+   "name": "ウエルシアで買い物（ポイント消化）",
+   "kind": "plan",
+   "place": "毎月20日・10:00"
+  },
+  {
+   "id": "20260721-passport",
+   "date": "2026-07-21",
+   "name": "パスポート更新手続き（期限切れ・要対応）",
+   "kind": "plan",
+   "place": "外務省オンライン申請 mofa.go.jp"
+  },
+  {
+   "id": "20260824-kuji-dbgt",
+   "date": "2026-08-24",
+   "name": "一番くじ ドラゴンボールGT",
+   "kind": "release",
+   "place": "オンライン販売17:00〜"
+  },
+  {
+   "id": "20260829-kuji-hxh",
+   "date": "2026-08-29",
+   "name": "一番くじ HUNTER×HUNTER GREED ISLAND②",
+   "kind": "release",
+   "place": ""
+  },
+  {
+   "id": "20260918-kuji-chainsaw",
+   "date": "2026-09-18",
+   "name": "一番くじ チェンソーマン レゼ篇 第2弾",
+   "kind": "release",
+   "place": ""
+  }
+ ]
 }
