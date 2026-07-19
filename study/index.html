@@ -699,6 +699,7 @@ function viewHome(){
       <button class="btn sec" onclick="go('quiz')">問題を選ぶ</button>
       <button class="btn sec" onclick="startQuiz({src:'weak'})">🛡 苦手だけ${weakN?`（${weakN}）`:''}</button>
     </div>
+    <button class="btn sec" style="margin-top:10px;border-color:var(--pri);color:var(--pri)" onclick="go('media')">🎬 動画・📖 資料ライブラリ（講義${Object.values(window.VIDEOS||{}).reduce((a,v)=>a+v.length,0)}本／教材PDF）</button>
 
     <div class="card" style="margin-top:14px">
       <div class="between" style="margin-bottom:10px"><h3 style="font-size:15px">科目別の手応え</h3><span class="mut" style="font-size:12px">正答率</span></div>
