@@ -446,12 +446,18 @@ window.QVIDEOS = {"kako-gyoA-H27-26": "11K2dFeSfjEiRht1UADmI1to0MT8xCGve", "kako
 
 </script>
 <script>
+/* 教材PDF（Drive・非公開）自動生成: build.py ← data/docs.json */
+window.DOCS = {"texts": {"宅建業法": "1ogGxWUh7ShpjVjfjigttTWS4kmgTdUWo", "法令上の制限": "1RjOsE5NderFu9GbzaoxXNY4vUyE9KiZj", "税その他": "16k5QD4OmD6tg7rPgBMzlt7LIPCGnsvaq", "権利関係": "1iI0wzK0vs35_juJwAkY4LS41f5nSuie5"}, "kako": {"宅建業法": [{"label": "過去問題集 宅建業法A", "id": "1Hkn9XQRQBTd1wrCia8pdTlOvuLXPZ_64"}, {"label": "過去問題集 宅建業法B", "id": "1PfNikFpflLoE7UEeSv0XZe2dUC2J8ujA"}], "法令上の制限": [{"label": "過去問題集 法令上の制限", "id": "1HmCwH0-KOM3aI2MuIB3CWCITMBBblGmT"}], "税その他": [{"label": "過去問題集 その他の法令", "id": "1wN6YSsjbSZXxf8z7CiA8wlHDpzo9f2HW"}], "権利関係": [{"label": "過去問題集 権利関係", "id": "1twQ5_nDdFlCbtbhRWn9rEGK61x7eFk-I"}]}, "others": [{"label": "入門講座", "id": "1cWjlnjQzBV7UYwe-g4Lxfms606nWfc53"}, {"label": "受講ガイド", "id": "1ubtDax2NIwHQ5wi-I6ligpF1uk4_TLUV"}, {"label": "戦略立案編", "id": "1Zz978JrdHxpW1gCa4L1uXDEtXyQkEL_b"}, {"label": "合格必勝編（直前期）", "id": "1B9wA9zugH7FrhN-U0yj9-dX1HqYHtY_B"}, {"label": "宅建士マンガ 第1話", "id": "1G4rsAOJMu6embow0VYWiegTy6W2oFyD8"}, {"label": "宅建士マンガ 第2話", "id": "1-gIOAA3iSXVeL0OOzgjMA1qmVpD640Z3"}, {"label": "宅建士マンガ 第3話", "id": "18QuCc4FZ2-ZjayRQPD2ENLQ4OB1fdrP5"}, {"label": "宅建士マンガ 第4話", "id": "1kKZARiKWPlrfK5dLk3k6HjUcXVXi9_Q3"}, {"label": "訂正情報（2026.07.13）", "id": "1vcTSX2dnN4ZWBsGE0tcZUiV6I5WcYD5G"}]};
+
+</script>
+<script>
 /* ============ 起動時フォールバック ============ */
 if(!window.SAMPLE_QUESTIONS){ window.SAMPLE_QUESTIONS = []; }
 if(!window.COURSE){ window.COURSE = {curriculum:[], reading:{}, questions:[]}; }
 if(!window.MASCOT){ window.MASCOT = {}; }
 if(!window.VIDEOS){ window.VIDEOS = {}; }
 if(!window.QVIDEOS){ window.QVIDEOS = {}; }
+if(!window.DOCS){ window.DOCS = {texts:{}, kako:{}, others:[]}; }
 /* 講義動画（Googleドライブ・非公開）。章番号(ch)で要点と紐づく */
 function vidsFor(subject, chapterNo){
   const ch = String(chapterNo).split("-")[0];
@@ -478,6 +484,14 @@ function viewMedia(){
     <div class="card" style="padding:13px 15px">
       <div class="sub" style="font-size:13px;margin-bottom:10px">タップでそのまま再生されます（あなたのドライブ・非公開）。過去問の解説動画は、問題を解いた画面の「🎬この問題の講師解説動画」から。</div>
       <a class="btn sm sec" style="display:block;text-align:center;text-decoration:none" href="${DRIVE_FOLDER}" target="_blank" rel="noopener">📁 ドライブの宅建フォルダを直接開く</a>
+    </div>
+    <div class="card">
+      <h3 style="font-size:15px;margin-bottom:8px">📖 資料（テキスト・問題集PDF）</h3>
+      ${SUBJECTS.map(s=>{const t=window.DOCS.texts[s.key]; const ks=window.DOCS.kako[s.key]||[];
+        return `${t?`<button class="vrow" onclick="playVid('${t}','基礎テキスト ${s.key}')"><span class="p">📖</span><span>基礎テキスト ${esc(s.key)}</span></button>`:''}
+        ${ks.map(k=>`<button class="vrow" onclick="playVid('${k.id}','${esc(k.label)}')"><span class="p">📗</span><span>${esc(k.label)}</span></button>`).join("")}`;}).join("")}
+      <div class="shop-group" style="font-size:12px;font-weight:800;color:var(--sub);margin:10px 0 4px">サポート・その他</div>
+      ${(window.DOCS.others||[]).map(d=>`<button class="vrow" onclick="playVid('${d.id}','${esc(d.label)}')"><span class="p">📘</span><span>${esc(d.label)}</span></button>`).join("")}
     </div>
     ${subs.map(sub=>{
       const vs=(window.VIDEOS[sub]||[]);
@@ -779,6 +793,7 @@ function viewChapter(){
         <span style="color:${subColor(sub)};font-weight:900;flex:0 0 auto;line-height:1.6">●</span>
         <span style="font-size:15px">${esc(p)}</span></div>`).join("")||'<div class="mut">要点データがありません。</div>'}
       <button class="btn ${done?'sec':''}" style="margin-top:8px" onclick="toggleReadCh('${sub}','${(''+no).replace(/'/g,"")}')">${done?'✓ 読了済み（タップで戻す）':'読んだ ✓'}</button>
+      ${window.DOCS.texts[sub]?`<button class="btn sm sec" style="width:100%;margin-top:8px" onclick="playVid('${window.DOCS.texts[sub]}','基礎テキスト ${sub}')">📖 テキストPDFを開く${c.page?'（P'+c.page+'〜）':''}</button>`:''}
     </div>
     ${(()=>{const vs=vidsFor(sub,no); if(!vs.length)return '';
       return `<div class="card"><h3 style="font-size:14px;margin-bottom:8px">🎬 この章の講義動画 <span class="pill">${vs.length}本</span></h3>
@@ -885,6 +900,7 @@ function viewQuiz(){
         review=`<div style="background:#fff6ec;border:1px solid #ffe3c4;border-radius:12px;padding:12px 14px;margin-top:10px">
           <div style="font-weight:800;font-size:13px;color:#b5641a;margin-bottom:8px">🔁 弱点つぶし — ここで復習</div>
           ${rc?`<button class="btn sm sec" style="width:100%;text-align:left;margin-bottom:6px" onclick="reviewChapter('${q.subject}','${(''+rc.no).replace(/'/g,"")}')">📖 要点『${esc(rc.title)}』${rc.page?'（テキストP'+rc.page+'）':''}</button>`:''}
+          ${window.DOCS.texts[q.subject]?`<button class="btn sm sec" style="width:100%;text-align:left;margin-bottom:6px" onclick="playVid('${window.DOCS.texts[q.subject]}','基礎テキスト ${q.subject}')">📕 テキストPDF原本を開く${rc&&rc.page?'（P'+rc.page+'）':''}</button>`:''}
           ${vs.slice(0,2).map(v=>`<button class="btn sm sec" style="display:block;width:100%;text-align:left;margin-bottom:6px" onclick="playVid('${v.id}','${esc(v.label)}')">▶ 動画『${esc(v.label)}』</button>`).join("")}
           ${vs.length>2?`<div class="mut" style="font-size:11px">ほか${vs.length-2}本は要点ページから</div>`:''}
         </div>`;
