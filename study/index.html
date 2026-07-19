@@ -638,7 +638,7 @@ function render(){
   renderNav();
   const el=document.getElementById("screen");
   if(QUIZ){ el.innerHTML=viewQuiz(); return; }
-  el.innerHTML = ({home:viewHome,learn:viewLearn,quiz:viewQuizMenu,weak:viewWeak,record:viewRecord,settings:viewSettings,help:viewHelp,media:viewMedia})[TAB]();
+  el.innerHTML = ({home:viewHome,learn:viewLearn,quiz:viewQuizMenu,weak:viewWeak,record:viewRecord,settings:viewSettings,help:viewHelp,media:viewMedia,timer:viewTimer})[TAB]();
   if(TAB==="learn"&&!LEARN.ch) mountLearn();
 }
 
@@ -724,7 +724,10 @@ function viewHome(){
       <button class="btn sec" onclick="go('quiz')">問題を選ぶ</button>
       <button class="btn sec" onclick="startQuiz({src:'weak'})">🛡 苦手だけ${weakN?`（${weakN}）`:''}</button>
     </div>
-    <button class="btn sec" style="margin-top:10px;border-color:var(--pri);color:var(--pri)" onclick="go('media')">🎬 動画・📖 資料ライブラリ（講義${Object.values(window.VIDEOS||{}).reduce((a,v)=>a+v.length,0)}本／教材PDF）</button>
+    <div class="grid2" style="margin-top:10px">
+      <button class="btn sec" style="border-color:var(--pri);color:var(--pri)" onclick="go('media')">🎬 動画・📖 資料</button>
+      <button class="btn sec" style="border-color:var(--warn);color:var(--warn)" onclick="go('timer')">⏱ 集中タイマー${TMR.state==='run'?'（動作中）':''}</button>
+    </div>
 
     <div class="card" style="margin-top:14px">
       <div class="between" style="margin-bottom:10px"><h3 style="font-size:15px">科目別の手応え</h3><span class="mut" style="font-size:12px">正答率</span></div>
@@ -1022,6 +1025,66 @@ function showResult(){
 function toggleMark(id){ const st=pg(id); st.mark=!st.mark; save(); render(); toast(st.mark?"⭐️ チェックしました":"チェック解除"); }
 function reviewChapter(sub,no){ QUIZ=null; TAB='learn'; LEARN.sub=sub; LEARN.ch={sub,no}; window.scrollTo(0,0); render(); }
 
+/* ============ 集中タイマー（ポモドーロ） ============ */
+let TMR={state:'idle', phase:'focus', left:25*60, end:0, focus:25, brk:5, done:0, iv:null};
+function tmrSet(f,b){ if(TMR.state==='run')return; TMR.focus=f; TMR.brk=b; TMR.phase='focus'; TMR.left=f*60; render(); }
+function tmrStart(){ if(TMR.state==='run')return; TMR.state='run'; TMR.end=Date.now()+TMR.left*1000;
+  if(!TMR.iv)TMR.iv=setInterval(tmrTick,500); tmrRender(); }
+function tmrPause(){ if(TMR.state!=='run')return; TMR.left=Math.max(0,Math.round((TMR.end-Date.now())/1000)); TMR.state='pause'; tmrRender(); }
+function tmrReset(){ TMR.state='idle'; TMR.phase='focus'; TMR.left=TMR.focus*60; tmrRender(); }
+function tmrTick(){
+  if(TMR.state!=='run'){ return; }
+  const left=Math.round((TMR.end-Date.now())/1000);
+  if(left>0){ TMR.left=left; tmrRender(); return; }
+  tmrBeep();
+  if(TMR.phase==='focus'){
+    TMR.done++;
+    const k=todayKey(); const e=S.log[k]||(S.log[k]={ans:0,c:0}); e.min=(e.min||0)+TMR.focus; save();
+    if(navigator.vibrate)navigator.vibrate([80,60,80]);
+    TMR.phase='break'; TMR.left=TMR.brk*60; TMR.end=Date.now()+TMR.left*1000; // 自動で休憩へ
+  } else {
+    TMR.phase='focus'; TMR.left=TMR.focus*60; TMR.state='pause'; // 休憩明けは一時停止で待つ
+  }
+  tmrRender();
+}
+function tmrBeep(){ try{ const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  const o=ctx.createOscillator(), g=ctx.createGain(); o.connect(g); g.connect(ctx.destination);
+  o.frequency.value=880; g.gain.setValueAtTime(.25,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.8); o.start(); o.stop(ctx.currentTime+.85);}catch(e){} }
+function tmrFmt(s){ return Math.floor(s/60)+":"+String(s%60).padStart(2,'0'); }
+function tmrRender(){ if(TAB!=='timer')return; const el=document.getElementById('tmrTime'); if(!el){render();return;}
+  el.textContent=tmrFmt(TMR.left);
+  const ph=document.getElementById('tmrPhase'); if(ph)ph.innerHTML=TMR.phase==='focus'?'🍅 集中タイム':'☕ 休憩タイム';
+  const bt=document.getElementById('tmrBtn'); if(bt)bt.textContent=TMR.state==='run'?'⏸ 一時停止':'▶ スタート';
+  const dn=document.getElementById('tmrDone'); if(dn)dn.textContent=TMR.done;
+}
+function viewTimer(){
+  const todayMin=(S.log[todayKey()]||{}).min||0;
+  const totalMin=Object.values(S.log).reduce((a,e)=>a+(e.min||0),0);
+  return `<div class="wrap">
+    <div class="between top"><span class="app">⏱ 集中タイマー</span><button class="pill" onclick="go('home')">✕ 閉じる</button></div>
+    <div class="card" style="text-align:center;padding:26px 16px">
+      <div id="tmrPhase" style="font-weight:800;color:var(--sub);font-size:15px">${TMR.phase==='focus'?'🍅 集中タイム':'☕ 休憩タイム'}</div>
+      <div id="tmrTime" style="font-size:72px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.15;color:${TMR.phase==='focus'?'var(--pri)':'var(--ok)'}">${tmrFmt(TMR.left)}</div>
+      <div class="mut" style="font-size:12px;margin-bottom:14px">集中${TMR.focus}分 → 休憩${TMR.brk}分 ・ 集中が終わると自動で記録されます</div>
+      <div class="grid2" style="margin-bottom:10px">
+        <button id="tmrBtn" class="btn hero-btn" onclick="TMR.state==='run'?tmrPause():tmrStart()">${TMR.state==='run'?'⏸ 一時停止':'▶ スタート'}</button>
+        <button class="btn sec" onclick="tmrReset()">↺ リセット</button>
+      </div>
+      <div class="seg" style="justify-content:center">
+        <button class="chip ${TMR.focus===25?'on':''}" onclick="tmrSet(25,5)">25分 / 休5分</button>
+        <button class="chip ${TMR.focus===50?'on':''}" onclick="tmrSet(50,10)">50分 / 休10分</button>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="stat"><b style="color:var(--pri)">🍅 <span id="tmrDone">${TMR.done}</span></b><s>今回の完了回数</s></div>
+      <div class="stat"><b style="color:var(--warn)">${todayMin}<span class="mut" style="font-size:13px">分</span></b><s>今日の集中時間</s></div>
+    </div>
+    <div class="msg" style="align-items:center">${mascot('study',56,'📚')}<span>タイマー中に「今日の問題」もアリ。画面を閉じてもタイマーは動き続けます。累計 ${Math.floor(totalMin/60)}時間${totalMin%60}分</span></div>
+    <div style="height:20px"></div>
+  </div>`;
+}
+
 /* ============ 苦手 ============ */
 function viewWeak(){
   const all=bank();
@@ -1068,10 +1131,11 @@ function viewRecord(){
     cells+=`<div class="d ${lv} ${td}">${d}</div>`; }
   return `<div class="wrap">
     <div class="top"><span class="app">学習記録</span></div>
-    <div class="grid4" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="grid4" style="grid-template-columns:1fr 1fr 1fr 1fr">
       <div class="stat"><b>🔥${streakDays()}</b><s>連続日</s></div>
       <div class="stat"><b>${totalAns}</b><s>のべ回答</s></div>
       <div class="stat"><b>${acc}%</b><s>通算正答</s></div>
+      <div class="stat"><b style="color:var(--warn)">${Object.values(S.log).reduce((a,e)=>a+(e.min||0),0)}</b><s>集中(分)</s></div>
     </div>
     <div class="card" style="margin-top:12px">
       <div class="between" style="margin-bottom:10px">
