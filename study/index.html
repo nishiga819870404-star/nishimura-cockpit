@@ -464,19 +464,16 @@ function vidsFor(subject, chapterNo){
   return (window.VIDEOS[subject]||[]).filter(v=>v.ch===ch);
 }
 function vidUrl(v){ return "https://drive.google.com/file/d/"+v.id+"/view"; }
-/* アプリ内プレーヤー（Drive埋め込み）。スマホは埋め込みがブロックされやすいのでDriveを直接開く */
+/* アプリ内プレーヤー（Drive埋め込み）。再生不可の環境向けに「Driveで開く」を常設 */
 function playVid(id,label){
-  if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)){
-    window.open("https://drive.google.com/file/d/"+id+"/view","_blank","noopener");
-    return;
-  }
   const old=document.getElementById('vmodal'); if(old)old.remove();
   const w=document.createElement('div'); w.className='vmodal'; w.id='vmodal';
   w.onclick=e=>{ if(e.target===w) w.remove(); };
   w.innerHTML=`<div class="vbox"><div class="vhead"><b>${esc(label||'講義動画')}</b>
     <a href="https://drive.google.com/file/d/${id}/view" target="_blank" rel="noopener">Driveで開く</a>
     <button onclick="document.getElementById('vmodal').remove()">✕</button></div>
-    <iframe src="https://drive.google.com/file/d/${id}/preview" allow="autoplay; fullscreen" allowfullscreen></iframe></div>`;
+    <iframe src="https://drive.google.com/file/d/${id}/preview" allow="autoplay; fullscreen" allowfullscreen></iframe>
+    <div style="background:var(--card);padding:8px 14px;font-size:11px;color:var(--mut)">再生できない・ログインを求められる場合は右上の「Driveで開く」からどうぞ</div></div>`;
   document.body.appendChild(w);
 }
 const DRIVE_FOLDER="https://drive.google.com/drive/folders/1aglXS3JkJAwjp8VG35_QNr7e998G7PLV";
