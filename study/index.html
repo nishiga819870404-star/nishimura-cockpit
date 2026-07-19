@@ -1028,8 +1028,11 @@ function reviewChapter(sub,no){ QUIZ=null; TAB='learn'; LEARN.sub=sub; LEARN.ch=
 /* ============ 集中タイマー（ポモドーロ） ============ */
 let TMR={state:'idle', phase:'focus', left:25*60, end:0, focus:25, brk:5, done:0, iv:null};
 function tmrSet(f,b){ if(TMR.state==='run')return; TMR.focus=f; TMR.brk=b; TMR.phase='focus'; TMR.left=f*60; render(); }
-function tmrStart(){ if(TMR.state==='run')return; TMR.state='run'; TMR.end=Date.now()+TMR.left*1000;
+function tmrStart(){ if(TMR.state==='run')return; tmrAudio(); TMR.state='run'; TMR.end=Date.now()+TMR.left*1000;
   if(!TMR.iv)TMR.iv=setInterval(tmrTick,500); tmrRender(); }
+/* iOSはユーザー操作時にしか音声を起動できないため、スタート時にAudioContextを確保・再開しておく */
+let ACTX=null;
+function tmrAudio(){ try{ if(!ACTX) ACTX=new (window.AudioContext||window.webkitAudioContext)(); if(ACTX.state==='suspended') ACTX.resume(); }catch(e){} }
 function tmrPause(){ if(TMR.state!=='run')return; TMR.left=Math.max(0,Math.round((TMR.end-Date.now())/1000)); TMR.state='pause'; tmrRender(); }
 function tmrReset(){ TMR.state='idle'; TMR.phase='focus'; TMR.left=TMR.focus*60; tmrRender(); }
 function tmrTick(){
@@ -1047,10 +1050,12 @@ function tmrTick(){
   }
   tmrRender();
 }
-function tmrBeep(){ try{ const ctx=new (window.AudioContext||window.webkitAudioContext)();
-  const o=ctx.createOscillator(), g=ctx.createGain(); o.connect(g); g.connect(ctx.destination);
-  o.frequency.value=880; g.gain.setValueAtTime(.25,ctx.currentTime);
-  g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.8); o.start(); o.stop(ctx.currentTime+.85);}catch(e){} }
+function tmrBeep(){ try{ tmrAudio(); if(!ACTX) return; const t0=ACTX.currentTime+.02;
+  [[880,0],[880,.28],[1318,.56]].forEach(([f,dt])=>{
+    const o=ACTX.createOscillator(), g=ACTX.createGain(); o.connect(g); g.connect(ACTX.destination);
+    o.frequency.value=f; g.gain.setValueAtTime(.3,t0+dt);
+    g.gain.exponentialRampToValueAtTime(.001,t0+dt+.24); o.start(t0+dt); o.stop(t0+dt+.26);
+  }); }catch(e){} }
 function tmrFmt(s){ return Math.floor(s/60)+":"+String(s%60).padStart(2,'0'); }
 function tmrRender(){ if(TAB!=='timer')return; const el=document.getElementById('tmrTime'); if(!el){render();return;}
   el.textContent=tmrFmt(TMR.left);
