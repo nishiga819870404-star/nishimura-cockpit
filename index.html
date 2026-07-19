@@ -354,6 +354,15 @@ canvas{max-width:100%;}
         <div id="todayTasks"></div>
       </div>
 
+      <div class="card">
+        <h2>📝 ひとことメモ <span class="tag">思いついたら即</span></h2>
+        <div style="display:flex;gap:8px">
+          <input id="tqMemo" style="flex:1;min-width:0;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:#fff;color:var(--text)" placeholder="気づき・アイデアをここに" autocomplete="off">
+          <button id="tqMemoBtn" style="background:var(--header);color:#fff;border:none;border-radius:10px;padding:0 16px;font-weight:800;font-family:inherit;cursor:pointer">メモ</button>
+        </div>
+        <div class="note" style="margin-top:7px;cursor:pointer" onclick="__today.go('p-memo')">カレンダーや過去のメモは 📝メモ帳へ ›</div>
+      </div>
+
       <div class="grid2">
         <div class="card today-mini" onclick="__today.go('p-study')">
           <div class="tm-ico">📚</div><div class="tm-label">勉強</div>
@@ -369,6 +378,8 @@ canvas{max-width:100%;}
         <button onclick="__today.go('p-shop')">🛒 買うもの</button>
         <button onclick="__today.go('p-summary')">📊 資産</button>
         <button onclick="__today.go('p-yutai')">🎁 優待</button>
+        <button onclick="__today.go('p-memo')">📝 メモ帳</button>
+        <button onclick="__today.go('p-manual')">📖 使い方</button>
       </div>
     </section>
 
@@ -744,22 +755,45 @@ canvas{max-width:100%;}
       #p-memo .m-add{background:var(--header);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-family:inherit}
       #p-memo .m-search{border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;font-family:inherit;width:100%;background:#fff;color:var(--text)}
       #p-memo .m-item{padding:11px 3px;border-bottom:1px solid var(--line)}
+      #p-memo .m-title{font-size:14px;font-weight:800;margin-bottom:3px}
       #p-memo .m-text{font-size:13.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
-      #p-memo .m-meta{display:flex;gap:8px;align-items:center;margin-top:4px;font-size:11px;color:var(--dim)}
-      #p-memo .m-del{background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;margin-left:auto}
+      #p-memo .m-text img{max-width:100%;border-radius:10px;margin-top:6px;display:block}
+      #p-memo .m-meta{display:flex;gap:8px;align-items:center;margin-top:5px;font-size:11px;color:var(--dim);flex-wrap:wrap}
+      #p-memo .m-btn{background:#F0F2FA;border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:11px;font-weight:700;border-radius:6px;padding:2px 8px;font-family:inherit}
+      #p-memo .m-del{background:none;border:none;color:var(--dim);cursor:pointer;font-size:12px;margin-left:auto;font-family:inherit}
       #p-memo .m-cloud{background:#E9ECFB;color:var(--header);font-size:10px;font-weight:800;border-radius:5px;padding:1px 6px}
+      #p-memo .m-kind{font-size:10px;font-weight:800;border-radius:5px;padding:1px 6px}
+      #p-memo .m-kind.diary{background:#FFF1E0;color:#c96a00}
+      #p-memo .m-kind.guide{background:#E4F7EC;color:#0d8a4f}
+      #p-memo .m-tgl{display:flex;gap:6px;margin-bottom:10px}
+      #p-memo .m-tgl button{flex:1;border:1.5px solid var(--line);background:#fff;color:var(--dim);border-radius:9px;padding:7px 0;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit}
+      #p-memo .m-tgl button.on{background:var(--header);border-color:var(--header);color:#fff}
+      #p-memo .mc-head{display:flex;align-items:center;justify-content:space-between;margin:4px 0 8px}
+      #p-memo .mc-head button{border:1px solid var(--line);background:#fff;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer;color:var(--text)}
+      #p-memo .mc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+      #p-memo .mc-w{font-size:10px;color:var(--dim);font-weight:800;padding:2px 0}
+      #p-memo .mc-day{padding:7px 0 9px;border-radius:8px;font-size:13px;position:relative;cursor:pointer;color:var(--text)}
+      #p-memo .mc-day.has{background:#E9ECFB;font-weight:800}
+      #p-memo .mc-day.sel{outline:2px solid var(--header)}
+      #p-memo .mc-dot{position:absolute;left:50%;transform:translateX(-50%);bottom:1px;font-size:8px;color:var(--header);font-weight:900}
+      #p-memo .m-more{color:var(--header);font-weight:800;text-decoration:none}
     </style>
     <section id="p-memo" class="hidden">
       <div class="card">
-        <h2>📝 メモ帳 <span class="tag">気づき・アイデア・リンク</span></h2>
+        <h2>📝 メモ帳 <span class="tag">気づき・アイデア・日記・ガイド</span></h2>
         <textarea id="memoText" placeholder="なんでもメモ（URLは自動でリンクになる）"></textarea>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button class="m-add" id="memoAdd" style="flex:1">＋ メモする</button>
           <button class="m-add" id="memoCopy" style="background:#F0F2FA;color:var(--text);border:1px solid var(--line)" title="この端末のメモを全コピー（Claudeに貼って同期）">📤 コピー</button>
         </div>
-        <div class="note" style="margin-top:8px">Claudeに「<b>メモしといて：◯◯</b>」でも追加できる（全端末に☁️同期）。「◯◯のメモあったっけ？」で検索もAIに任せられる。</div>
+        <div class="note" style="margin-top:8px">Claudeに「<b>メモしといて：◯◯</b>」で☁️同期、「<b>今日の日記つけといて</b>」で📔日記に。「◯◯のメモあったっけ？」で検索もAI任せ。</div>
       </div>
       <div class="card">
+        <div class="m-tgl">
+          <button id="mTglL" class="on">📃 リスト</button>
+          <button id="mTglC">🗓 カレンダー</button>
+        </div>
+        <div id="memoCal" style="display:none;margin-bottom:10px"></div>
         <input id="memoSearch" class="m-search" placeholder="🔍 検索（打つだけで絞り込み）" autocomplete="off">
         <div id="memoList" style="margin-top:6px"></div>
       </div>
@@ -770,42 +804,102 @@ canvas{max-width:100%;}
       const g=id=>document.getElementById(id);
       let local=[]; try{local=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){local=[]}
       let remote=[];
+      const V={mode:'list', y:0, mo:0, day:null};
+      const OPEN={}; const LONG=300;
       const save=()=>localStorage.setItem(KEY,JSON.stringify(local));
-      const esc=t=>String(t==null?'':t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+      const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
       const linkify=t=>esc(t).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
       const ds=()=>{const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')};
       function allMemos(){
         const r=remote.map(m=>({...m,remote:true}));
-        return local.concat(r).sort((a,b)=>(b.date||'')<(a.date||'')?-1:((b.date||'')>(a.date||'')?1:(b.id<a.id?-1:1)));
+        return local.concat(r).sort((a,b)=>(a.date||'')>(b.date||'')?-1:((a.date||'')<(b.date||'')?1:(a.id>b.id?-1:1)));
+      }
+      function findM(id){ return allMemos().find(m=>m.id===id); }
+      function kindBadge(m){
+        if(m.kind==='diary')return '<span class="m-kind diary">📔 日記</span>';
+        if(m.kind==='guide')return '<span class="m-kind guide">📖 ガイド</span>';
+        return '';
+      }
+      function bodyHTML(m){
+        const t=String(m.text||'');
+        let h;
+        if(t.length>LONG && !OPEN[m.id]){
+          h=linkify(t.slice(0,LONG))+'&hellip; <a href="javascript:void(0)" class="m-more" onclick="__memo.open(\''+m.id+'\')">▼ 続きを読む</a>';
+        }else{
+          h=linkify(t);
+          if(t.length>LONG) h+=' <a href="javascript:void(0)" class="m-more" onclick="__memo.close(\''+m.id+'\')">▲ 閉じる</a>';
+        }
+        if(Array.isArray(m.img)) m.img.forEach(u=>{ h+='<img src="'+esc(u)+'" loading="lazy" alt="">'; });
+        return h;
+      }
+      function calHTML(){
+        const byDate={};
+        allMemos().forEach(m=>{ if(m.date) byDate[m.date]=(byDate[m.date]||0)+1; });
+        const y=V.y, mo=V.mo;
+        const startDow=new Date(y,mo,1).getDay(), days=new Date(y,mo+1,0).getDate();
+        let cells='';
+        for(let i=0;i<startDow;i++)cells+='<div></div>';
+        for(let d=1;d<=days;d++){
+          const k=y+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+          const n=byDate[k]||0;
+          cells+='<div class="mc-day'+(n?' has':'')+(V.day===k?' sel':'')+'" onclick="__memo.day(\''+k+'\')">'+d+(n?'<span class="mc-dot">●'+(n>1?n:'')+'</span>':'')+'</div>';
+        }
+        return '<div class="mc-head"><button onclick="__memo.mv(-1)">‹</button><b>'+y+'年 '+(mo+1)+'月</b><button onclick="__memo.mv(1)">›</button></div>'
+          +'<div class="mc-grid">'+'日月火水木金土'.split('').map(w=>'<div class="mc-w">'+w+'</div>').join('')+cells+'</div>'
+          +(V.day?'<div class="note" style="margin-top:6px">'+V.day+' のメモを表示中（もう一度タップで解除）</div>':'');
       }
       function render(){
         const el=g('memoList'); if(!el)return;
+        const cal=g('memoCal');
+        if(V.mode==='cal'){ cal.style.display='block'; cal.innerHTML=calHTML(); }
+        else{ cal.style.display='none'; }
         const qq=(g('memoSearch').value||'').toLowerCase();
-        const ms=allMemos().filter(m=>!qq||String(m.text).toLowerCase().indexOf(qq)>=0);
-        el.innerHTML=ms.length?ms.map(m=>'<div class="m-item"><div class="m-text">'+linkify(m.text)+'</div>'
+        let ms=allMemos().filter(m=>!qq||((m.text||'')+' '+(m.title||'')).toLowerCase().indexOf(qq)>=0);
+        if(V.mode==='cal'&&V.day) ms=ms.filter(m=>m.date===V.day);
+        el.innerHTML=ms.length?ms.map(m=>'<div class="m-item">'
+          +(m.title?'<div class="m-title">'+esc(m.title)+'</div>':'')
+          +'<div class="m-text">'+bodyHTML(m)+'</div>'
           +'<div class="m-meta"><span>'+esc(m.date||'')+'</span>'
+          +kindBadge(m)
           +(m.remote?'<span class="m-cloud">☁️ 同期</span>':'')
+          +'<button class="m-btn" onclick="__memo.cp(\''+m.id+'\',this)">📋 コピー</button>'
           +(m.remote?'':'<button class="m-del" onclick="__memo.del(\''+m.id+'\')">✕ 削除</button>')
           +'</div></div>').join('')
-          :'<div class="note" style="margin-top:8px">'+(qq?'「'+esc(qq)+'」に一致するメモなし':'まだメモがありません。上の欄からどうぞ')+'</div>';
+          :'<div class="note" style="margin-top:8px">'+(qq||V.day?'一致するメモなし':'まだメモがありません。上の欄からどうぞ')+'</div>';
       }
       window.__memo={
-        del:id=>{ local=local.filter(m=>m.id!==id); save(); render(); }
+        del:id=>{ local=local.filter(m=>m.id!==id); save(); render(); },
+        add:t=>{ t=String(t||'').trim(); if(!t)return; local.unshift({id:'m'+Date.now(),date:ds(),text:t}); save(); render(); },
+        cp:(id,btn)=>{ const m=findM(id); if(!m)return;
+          const txt=(m.title?m.title+'\n':'')+String(m.text||'');
+          const done=()=>{ if(btn){btn.textContent='✓ コピーした'; setTimeout(()=>{btn.textContent='📋 コピー'},1400);} };
+          if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(()=>prompt('長押しでコピー',txt)); }
+          else prompt('長押しでコピー',txt); },
+        open:id=>{ OPEN[id]=1; render(); },
+        close:id=>{ delete OPEN[id]; render(); },
+        day:k=>{ V.day=(V.day===k?null:k); render(); },
+        mv:d=>{ V.mo+=d; if(V.mo<0){V.mo=11;V.y--;} if(V.mo>11){V.mo=0;V.y++;} V.day=null; render(); },
+        mode:m=>{ V.mode=m; g('mTglL').classList.toggle('on',m==='list'); g('mTglC').classList.toggle('on',m==='cal'); render(); }
       };
-      function add(){
-        const t=g('memoText').value.trim(); if(!t)return;
-        local.unshift({id:'m'+Date.now(),date:ds(),text:t}); save();
-        g('memoText').value=''; render();
-      }
       function init(){
         if(!g('memoAdd'))return;
-        g('memoAdd').addEventListener('click',add);
+        const n=new Date(); V.y=n.getFullYear(); V.mo=n.getMonth();
+        g('memoAdd').addEventListener('click',()=>{ window.__memo.add(g('memoText').value); g('memoText').value=''; });
         g('memoSearch').addEventListener('input',render);
+        g('mTglL').addEventListener('click',()=>window.__memo.mode('list'));
+        g('mTglC').addEventListener('click',()=>window.__memo.mode('cal'));
         g('memoCopy').addEventListener('click',()=>{
           if(!local.length){alert('この端末のメモはありません');return;}
           const txt='以下を西村OSのメモ(memo.json)に同期して:\n'+local.map(m=>'['+m.date+'] '+m.text).join('\n');
           (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>alert('コピーしました。Claudeに貼り付けてください')).catch(()=>prompt('コピーして使ってください',txt));
         });
+        const tq=g('tqMemo'), tqB=g('tqMemoBtn');
+        if(tq&&tqB){
+          const doAdd=()=>{ if(!tq.value.trim())return; window.__memo.add(tq.value); tq.value='';
+            tq.placeholder='✓ メモしました（📝タブに保存）'; setTimeout(()=>{tq.placeholder='気づき・アイデアをここに';},1600); };
+          tqB.addEventListener('click',doAdd);
+          tq.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doAdd();} });
+        }
         fetch('./memo.json?ts='+Date.now()).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.memos){remote=j.memos; render();} }).catch(()=>{});
         render();
       }
@@ -861,6 +955,7 @@ canvas{max-width:100%;}
           <li>「済み」チェックは端末ごとの記録（スマホで消してもPCには残る）</li>
         </ul>
 
+        <div class="note" style="margin:4px 0 10px">🏠今日タブの「📝ひとことメモ」からも即メモできる（Enterでも保存）。</div>
         <h3 style="margin:14px 0 6px">📅 予定・買うものの入れ方（3ルート）</h3>
         <ul>
           <li><b>①Claude Codeに「◯◯を予定に入れといて」</b> → 約1分で全端末の🏠今日・🛒買うものに☁️付きで反映（正データ=リポジトリのyotei.json。スプシではない）</li>
@@ -893,6 +988,10 @@ canvas{max-width:100%;}
           <li>Claudeに「<b>メモしといて：◯◯</b>」→ 全端末に☁️同期</li>
           <li>探すときは検索ボックス、または「<b>◯◯のメモあったっけ？</b>」とAIに聞く。「メモ整理して」もOK</li>
           <li>端末メモをまとめて同期したいときは「📤コピー」→ Claudeに貼り付け</li>
+          <li>🗓カレンダー表示でいつメモしたか一目瞭然。日付タップでその日のメモだけ表示</li>
+          <li>「<b>今日の日記つけといて</b>」→ その日の出来事をClaudeが📔日記メモにして保存（日記帳になる）</li>
+          <li>各メモの「📋コピー」で全文を1タップコピー（選択ミスなし）</li>
+          <li>各サービスの使い方は📖ガイドメモとして常備（ペンギンアバター/AIオフィス/提案ナレッジ）</li>
         </ul>
 
         <h3 style="margin:14px 0 6px">📡 レーダー受信箱</h3>
