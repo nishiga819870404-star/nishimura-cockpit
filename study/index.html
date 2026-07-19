@@ -464,8 +464,12 @@ function vidsFor(subject, chapterNo){
   return (window.VIDEOS[subject]||[]).filter(v=>v.ch===ch);
 }
 function vidUrl(v){ return "https://drive.google.com/file/d/"+v.id+"/view"; }
-/* アプリ内プレーヤー（Drive埋め込み）。再生できない環境向けに「Driveで開く」も常設 */
+/* アプリ内プレーヤー（Drive埋め込み）。スマホは埋め込みがブロックされやすいのでDriveを直接開く */
 function playVid(id,label){
+  if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)){
+    window.open("https://drive.google.com/file/d/"+id+"/view","_blank","noopener");
+    return;
+  }
   const old=document.getElementById('vmodal'); if(old)old.remove();
   const w=document.createElement('div'); w.className='vmodal'; w.id='vmodal';
   w.onclick=e=>{ if(e.target===w) w.remove(); };
