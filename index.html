@@ -788,6 +788,17 @@ canvas{max-width:100%;}
         </div>
         <div class="note" style="margin-top:8px">Claudeに「<b>メモしといて：◯◯</b>」で☁️同期、「<b>今日の日記つけといて</b>」で📔日記に。「◯◯のメモあったっけ？」で検索もAI任せ。</div>
       </div>
+      <div id="memoSel" style="display:none;position:fixed;inset:0;background:rgba(20,24,45,.55);z-index:99;padding:14px;box-sizing:border-box" onclick="if(event.target===this)__memo.selClose()">
+        <div style="background:#fff;border-radius:14px;max-width:560px;margin:26px auto 0;padding:14px;display:flex;flex-direction:column;gap:9px;max-height:82vh;box-shadow:0 12px 40px rgba(0,0,0,.25)">
+          <b style="font-size:13px;color:var(--text)">✂️ 選んでコピー <span style="font-weight:400;color:var(--dim)">— なぞって選択（大きいから選びやすい）</span></b>
+          <textarea id="memoSelTa" readonly style="flex:1;min-height:46vh;border:1.5px solid var(--line);border-radius:10px;padding:12px;font-size:15px;line-height:1.8;font-family:inherit;background:#FAFBFF;color:var(--text);-webkit-user-select:text;user-select:text"></textarea>
+          <div style="display:flex;gap:8px">
+            <button onclick="__memo.selAll()" style="flex:1;background:#F0F2FA;border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 0;font-weight:800;font-family:inherit;cursor:pointer">全選択</button>
+            <button onclick="__memo.selCopyAll()" style="flex:1;background:var(--header);color:#fff;border:none;border-radius:10px;padding:10px 0;font-weight:800;font-family:inherit;cursor:pointer" id="memoSelCp">📋 全文コピー</button>
+            <button onclick="__memo.selClose()" style="flex:1;background:#fff;border:1px solid var(--line);color:var(--dim);border-radius:10px;padding:10px 0;font-weight:800;font-family:inherit;cursor:pointer">閉じる</button>
+          </div>
+        </div>
+      </div>
       <div class="card">
         <div class="m-tgl">
           <button id="mTglL" class="on">📃 リスト</button>
@@ -863,6 +874,7 @@ canvas{max-width:100%;}
           +kindBadge(m)
           +(m.remote?'<span class="m-cloud">☁️ 同期</span>':'')
           +'<button class="m-btn" onclick="__memo.cp(\''+m.id+'\',this)">📋 コピー</button>'
+          +'<button class="m-btn" onclick="__memo.sel(\''+m.id+'\')">✂️ 選んでコピー</button>'
           +(m.remote?'':'<button class="m-del" onclick="__memo.del(\''+m.id+'\')">✕ 削除</button>')
           +'</div></div>').join('')
           :'<div class="note" style="margin-top:8px">'+(qq||V.day?'一致するメモなし':'まだメモがありません。上の欄からどうぞ')+'</div>';
@@ -875,6 +887,13 @@ canvas{max-width:100%;}
           const done=()=>{ if(btn){btn.textContent='✓ コピーした'; setTimeout(()=>{btn.textContent='📋 コピー'},1400);} };
           if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(()=>prompt('長押しでコピー',txt)); }
           else prompt('長押しでコピー',txt); },
+        sel:id=>{ const m=findM(id); if(!m)return; const ta=g('memoSelTa');
+          ta.value=(m.title?m.title+'\n\n':'')+String(m.text||''); g('memoSel').style.display='block'; },
+        selAll:()=>{ const ta=g('memoSelTa'); ta.focus(); ta.setSelectionRange(0,ta.value.length); },
+        selCopyAll:()=>{ const ta=g('memoSelTa'), btn=g('memoSelCp');
+          const done=()=>{ btn.textContent='✓ コピーした'; setTimeout(()=>{btn.textContent='📋 全文コピー'},1400); };
+          if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(ta.value).then(done).catch(()=>{}); } },
+        selClose:()=>{ g('memoSel').style.display='none'; },
         open:id=>{ OPEN[id]=1; render(); },
         close:id=>{ delete OPEN[id]; render(); },
         day:k=>{ V.day=(V.day===k?null:k); render(); },
@@ -900,6 +919,15 @@ canvas{max-width:100%;}
           tqB.addEventListener('click',doAdd);
           tq.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doAdd();} });
         }
+        try{
+          const u=new URL(location.href), am=u.searchParams.get('addmemo');
+          if(am&&am.trim()){
+            window.__memo.add(am);
+            u.searchParams.delete('addmemo');
+            history.replaceState(null,'',u.pathname+(u.searchParams.toString()?'?'+u.searchParams.toString():'')+u.hash);
+            const nv=document.querySelector('.navitem[data-page="p-memo"]'); if(nv) nv.click();
+          }
+        }catch(e){}
         fetch('./memo.json?ts='+Date.now()).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.memos){remote=j.memos; render();} }).catch(()=>{});
         render();
       }
@@ -990,7 +1018,8 @@ canvas{max-width:100%;}
           <li>端末メモをまとめて同期したいときは「📤コピー」→ Claudeに貼り付け</li>
           <li>🗓カレンダー表示でいつメモしたか一目瞭然。日付タップでその日のメモだけ表示</li>
           <li>「<b>今日の日記つけといて</b>」→ その日の出来事をClaudeが📔日記メモにして保存（日記帳になる）</li>
-          <li>各メモの「📋コピー」で全文を1タップコピー（選択ミスなし）</li>
+          <li>各メモの「📋コピー」で全文を1タップ、「✂️選んでコピー」で大きな画面から部分選択</li>
+          <li>Safariの共有→「西村OSにメモ」ショートカットで、見てるサイトのURLを直接メモに保存できる</li>
           <li>各サービスの使い方は📖ガイドメモとして常備（ペンギンアバター/AIオフィス/提案ナレッジ）</li>
         </ul>
 
