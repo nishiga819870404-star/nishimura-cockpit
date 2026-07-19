@@ -359,7 +359,7 @@ canvas{max-width:100%;}
         </div>
         <div class="card today-mini" onclick="__today.go('p-health')">
           <div class="tm-ico">🏃</div><div class="tm-label">健康</div>
-          <div class="tm-val" style="font-size:13px;color:var(--dim)">記録する →</div>
+          <div class="tm-val" id="todayKcal" style="font-size:13px;color:var(--dim)">記録する →</div>
         </div>
       </div>
 
@@ -1500,6 +1500,9 @@ function renderHealth(meal, weight, now){
   window.__meals = ms;
   const byDay = {};
   ms.forEach(m=>{ if(!byDay[m.dk])byDay[m.dk]={kcal:0,p:0,f:0,c:0,items:[]}; const d=byDay[m.dk]; d.kcal+=m.kcal; d.p+=m.p; d.f+=m.f; d.c+=m.c; d.items.push(m); });
+  /* 今日タブ用: 本日のカロリー/PFCを公開 */
+  window.__healthToday = byDay[todayKey] ? {kcal:byDay[todayKey].kcal,p:byDay[todayKey].p,f:byDay[todayKey].f,c:byDay[todayKey].c} : {kcal:0,p:0,f:0,c:0};
+  if(window.__todayHealthRefresh) window.__todayHealthRefresh();
   const dayKeys = Object.keys(byDay).sort();
 
   const today = byDay[todayKey];
@@ -2257,6 +2260,12 @@ window.__yotei = fetch('./yotei.json?ts='+Date.now())
     const p=penguin(items,si);
     if(p.img)g('todayPeng').src=p.img;
     g('todayMsg').textContent=p.msg;
+    const h=window.__healthToday, hk=g('todayKcal');
+    if(hk&&h&&h.kcal>0){
+      hk.style.color='var(--text)'; hk.style.fontSize='15px'; hk.style.fontWeight='900';
+      hk.innerHTML=Math.round(h.kcal).toLocaleString()+'<span style="font-size:11px;font-weight:700">kcal</span>'+
+        '<div style="font-size:10px;color:var(--dim);font-weight:700;margin-top:2px">P'+Math.round(h.p)+' / F'+Math.round(h.f)+' / C'+Math.round(h.c)+'</div>';
+    }
   }
   window.__today={
     toggle:id=>{
@@ -2267,6 +2276,7 @@ window.__yotei = fetch('./yotei.json?ts='+Date.now())
   function init(){ if(!g('todayTasks'))return; render();
     const nav=document.querySelector('.navitem[data-page="p-today"]'); if(nav)nav.addEventListener('click',render);
     if(window.__yotei)window.__yotei.then(j=>{REMOTE=(j&&j.items)||[];render();});
+    window.__todayHealthRefresh=render;
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
