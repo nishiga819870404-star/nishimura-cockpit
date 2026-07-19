@@ -307,6 +307,7 @@ canvas{max-width:100%;}
     <div class="navitem" data-page="p-health"><span class="ico">🏃</span>健康</div>
     <div class="navitem" data-page="p-report"><span class="ico">📝</span>月次レポート</div>
     <div class="navitem" data-page="p-study"><span class="ico">📚</span>勉強</div>
+    <div class="navitem" data-page="p-radar"><span class="ico">📡</span>レーダー</div>
     <div class="navitem" data-page="p-manual"><span class="ico">📖</span>使い方</div>
   </nav>
 
@@ -736,8 +737,45 @@ canvas{max-width:100%;}
         style="display:block;width:100%;height:84vh;min-height:520px;border:0;border-radius:14px;background:#eef2fb;box-shadow:0 2px 14px rgba(40,60,130,.08)"></iframe>
     </section>
 
+    <!-- ===== page: radar（レーダー受信箱） ===== -->
+    <section id="p-radar" class="hidden">
+      <div class="card">
+        <h2>📡 レーダー受信箱 <span class="tag">優待・ポケカ・ニュース</span></h2>
+        <div id="radarList"><div class="note">まだ受信なし。コワークで「優待レーダー」「ポケカレーダー」を実行したあと、「<b>結果を西村OSに載せて</b>」と言う（またはClaude Codeに頼む）と、ここに結果が貯まっていきます。</div></div>
+      </div>
+    </section>
+    <script>
+    fetch('./radar.json?ts='+Date.now()).then(r=>r.ok?r.json():null).then(j=>{
+      if(!j||!j.entries||!j.entries.length)return;
+      const esc=t=>String(t==null?'':t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+      const COL={'優待レーダー':'#43C59E','ポケカレーダー':'#8E7CE0','システム':'#8A93A6'};
+      const es=[...j.entries].sort((a,b)=>a.date<b.date?1:-1);
+      document.getElementById('radarList').innerHTML=es.map(e=>
+        '<div style="padding:11px 2px;border-bottom:1px solid var(--line)">'
+        +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:3px">'
+        +'<span style="background:'+(COL[e.source]||'#5B67CA')+';color:#fff;font-size:10px;font-weight:800;border-radius:5px;padding:2px 7px">'+esc(e.source||'情報')+'</span>'
+        +'<b style="font-size:13.5px">'+esc(e.title)+'</b>'
+        +'<span style="margin-left:auto;font-size:11px;color:var(--dim)">'+esc(e.date)+'</span></div>'
+        +(e.body?'<div style="font-size:12.5px;color:var(--dim);line-height:1.7;white-space:pre-wrap">'+esc(e.body)+'</div>':'')
+        +'</div>').join('');
+    }).catch(()=>{});
+    </script>
+
     <!-- ===== page: manual ===== -->
     <section id="p-manual" class="hidden">
+      <div class="card">
+        <h2>🗣 合言葉早見表 <span class="tag">なんて言えばいいんだっけ？</span></h2>
+        <table class="t" style="width:100%;font-size:12.5px">
+          <tr><th style="width:88px">分野</th><th>合言葉（言う相手）</th></tr>
+          <tr><td>📅 予定</td><td>「<b>◯◯を予定に入れといて</b>」「◯◯消して」「日付変えて」→ <b>Claude Code</b>（Macのクロード）。1分で全端末の🏠今日に反映</td></tr>
+          <tr><td>💰 家計</td><td>「<b>取り込んで</b>」(レシート/口座スクショ)・「<b>棚卸しして</b>」「今月どうだった？」「FP相談」「健康レポート出して」→ <b>コワーク</b></td></tr>
+          <tr><td>📈 株</td><td>「◯◯<b>どう思う？</b>」「◯◯を<b>ウォッチに入れて目標△円</b>」「<b>株を紹介して</b>」「今日◯◯を100株△円で<b>買った</b>」「◯◯を<b>欲しいものリストに入れて</b>」→ コワーク</td></tr>
+          <tr><td>🎴 レーダー</td><td>「<b>優待レーダー</b>」「<b>ポケカレーダー</b>」→ コワーク。実行後「<b>結果を西村OSに載せて</b>」で📡タブに保存</td></tr>
+          <tr><td>📚 勉強</td><td>アプリ内で完結（今日の問題・確認テスト・集中タイマー）。教材追加や改修は→ Claude Code</td></tr>
+          <tr><td>🔧 改修</td><td>「西村OS<b>直して/機能足して</b>」「宅建アプリ◯◯して」→ <b>Claude Code</b></td></tr>
+        </table>
+        <div class="note" style="margin-top:10px">株価は毎日18時にスプシが自動更新（クレジット消費ゼロ）。優待レーダーのフル実行は重いので週1〜月1が目安。</div>
+      </div>
       <div class="card manual">
         <h2>使い方・マニュアル <span class="tag">2026-07-12版</span></h2>
 
