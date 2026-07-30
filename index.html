@@ -1443,7 +1443,10 @@ function render(d){
     for(let i=1;i<d.meisai.length;i++){
       const r=d.meisai[i];const dt=ym(r[0]);const amt=num(r[3]);
       if(!dt||amt===null||!r[2])continue;
-      window.__meisai.push({y:dt.y,m:dt.m,store:r[1]||'',item:r[2],amt,pay:r[4]||'',cat:catOverride((r[1]||'')+' '+(r[2]||''), r[5]||'その他')});
+const _payNew=(r[6]||'').trim();
+        const _pay=_payNew||r[4]||'';
+        const _catRaw=_payNew?(r[4]||''):(r[5]||'');
+        window.__meisai.push({y:dt.y,m:dt.m,store:r[1]||'',item:r[2],amt,pay:_pay,cat:catOverride((r[1]||'')+' '+(r[2]||''), _catRaw||'その他')});
     }
   }
 
