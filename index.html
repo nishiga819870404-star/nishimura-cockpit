@@ -561,20 +561,20 @@ canvas{max-width:100%;}
     <!-- ===== page: health（🏃 ダイエット・健康ログ） ===== -->
     <section id="p-health" class="hidden">
       <div class="kpis">
-        <div class="kpi" style="--accent:var(--purple)">
+        <div class="kpi clickable" style="--accent:var(--purple)" onclick="showBodyHistory('kg')">
           <div class="lb">現在の体重</div>
           <div class="val" id="h-weight">—</div>
-          <div class="sub" id="h-weight-sub">🎯 目標70.0kg・「今朝◯◯kg」で記録開始</div>
+          <div class="sub" id="h-weight-sub">🎯 目標70.0kg・クリックで過去の全記録</div>
         </div>
         <div class="kpi clickable" style="--accent:var(--green)" onclick="if(window.__todayKey&&(window.__mealByDay||{})[window.__todayKey])showMealDay(window.__todayKey)">
           <div class="lb">今日の摂取カロリー</div>
           <div class="val" id="h-kcal">—</div>
           <div class="sub" id="h-kcal-sub">食事写真を投げるだけ・クリックで今日の明細</div>
         </div>
-        <div class="kpi" style="--accent:var(--amber)">
+        <div class="kpi clickable" style="--accent:var(--amber)" onclick="showPfcHistory()">
           <div class="lb">今日のPFC</div>
           <div class="val" id="h-pfc" style="font-size:17px;">—</div>
-          <div class="sub">目標 P140 / F60 / C200 g</div>
+          <div class="sub">目標 P140 / F60 / C200 g・クリックで推移</div>
         </div>
         <div class="kpi" style="--accent:var(--income)">
           <div class="lb">記録日数</div>
@@ -616,6 +616,7 @@ canvas{max-width:100%;}
             <button type="button" class="metricBtn" data-metric="bmi" onclick="toggleBodyMetric('bmi')">BMI</button>
           </div>
           <canvas id="weightChart" height="230"></canvas>
+          <div style="margin-top:10px;"><button type="button" class="metricBtn" onclick="showBodyHistory(window.__bodyMetric||'kg')">📋 過去の全記録を見る</button></div>
           <div class="note" id="weightNote">「今朝◯◯.◯kg」と送るか体重計の写真で記録。毎朝同じ時間帯の測定が理想。</div>
         </div>
         <div class="card">
@@ -623,6 +624,24 @@ canvas{max-width:100%;}
           <canvas id="kcalChart" height="230"></canvas>
           <div class="note">推定値（±2〜3割）。正確さより「傾向と継続」を見る。</div>
         </div>
+      </div>
+
+      <div class="card">
+        <h2>🍚 PFC・カロリーの推移 <span class="tag">いつ多くて、いつ少なかったか</span></h2>
+        <div id="pfcMetricToggle" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+          <button type="button" class="metricBtn active" data-pfc="all" onclick="togglePfcMetric('all')">まとめて</button>
+          <button type="button" class="metricBtn" data-pfc="p" onclick="togglePfcMetric('p')">たんぱく質</button>
+          <button type="button" class="metricBtn" data-pfc="f" onclick="togglePfcMetric('f')">脂質</button>
+          <button type="button" class="metricBtn" data-pfc="c" onclick="togglePfcMetric('c')">炭水化物</button>
+          <button type="button" class="metricBtn" data-pfc="kcal" onclick="togglePfcMetric('kcal')">カロリー</button>
+        </div>
+        <div id="pfcRangeToggle" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+          <button type="button" class="metricBtn" data-range="14" onclick="togglePfcRange(14)">直近14日</button>
+          <button type="button" class="metricBtn active" data-range="30" onclick="togglePfcRange(30)">直近30日</button>
+          <button type="button" class="metricBtn" data-range="0" onclick="togglePfcRange(0)">全期間</button>
+        </div>
+        <canvas id="pfcChart" height="200"></canvas>
+        <div class="note" id="pfcNote">目標 P140 / F60 / C200g・2,000kcal。棒が緑なら目標内、赤なら超過。破線は7日移動平均。</div>
       </div>
 
       <div class="card">
@@ -1172,6 +1191,213 @@ function renderWeightChart(metric){
 function toggleBodyMetric(m){ renderWeightChart(m); }
 window.toggleBodyMetric = toggleBodyMetric;
 
+/* ===== 体組成の全履歴モーダル（体重KPI・グラフ下のボタンから） ===== */
+const BODY_COLS = [
+  {k:'kg',      label:'体重',     unit:'kg',   dec:1},
+  {k:'fat',     label:'体脂肪率', unit:'%',    dec:1},
+  {k:'fatMass', label:'体脂肪量', unit:'kg',   dec:2},
+  {k:'muscle',  label:'筋肉量',   unit:'kg',   dec:2},
+  {k:'bmi',     label:'BMI',      unit:'',     dec:1},
+  {k:'bmr',     label:'基礎代謝', unit:'',     dec:0},
+  {k:'water',   label:'水分量',   unit:'%',    dec:1}
+];
+function showBodyHistory(metric){
+  metric = metric || 'kg';
+  const ws = (window.__weights||[]);
+  if(!ws.length){ openModal('<h3>体組成の記録</h3><div class="sub">まだ記録がありません。「今朝◯◯.◯kg」と送るか体重計の写真で記録できます。</div>'); return; }
+  const cfg = METRICS[metric] || METRICS.kg;
+  const first = ws[0], last = ws[ws.length-1];
+
+  /* 週平均（月曜始まり） */
+  const wk = {};
+  ws.forEach(w=>{
+    const d = new Date(w.dk+'T00:00:00+09:00');
+    const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay()+6)%7));
+    const key = mon.toISOString().slice(0,10);
+    (wk[key] = wk[key] || []).push(w);
+  });
+  const wkKeys = Object.keys(wk).sort();
+
+  let html = `<h3>体組成の全記録</h3><div class="sub">${first.dk} 〜 ${last.dk}・全${ws.length}回　｜　開始からの変化: 体重 <b>${(last.kg-first.kg>=0?'+':'−')+Math.abs(last.kg-first.kg).toFixed(1)}kg</b>`;
+  if(first.fatMass!=null && last.fatMass!=null) html += `・体脂肪量 <b>${(last.fatMass-first.fatMass>=0?'+':'−')+Math.abs(last.fatMass-first.fatMass).toFixed(1)}kg</b>`;
+  if(first.muscle!=null && last.muscle!=null) html += `・筋肉量 <b>${(last.muscle-first.muscle>=0?'+':'−')+Math.abs(last.muscle-first.muscle).toFixed(1)}kg</b>`;
+  html += `</div>`;
+
+  html += `<canvas id="modalCanvas" height="190"></canvas>`;
+
+  /* 週平均の推移 */
+  html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">週平均の推移（${cfg.label}）</h4>`;
+  let prevAvg = null;
+  html += wkKeys.map(k=>{
+    const vals = wk[k].map(w=>w[metric]).filter(v=>v!=null);
+    if(!vals.length) return '';
+    const avg = vals.reduce((s,v)=>s+v,0)/vals.length;
+    const diff = prevAvg==null ? null : avg-prevAvg;
+    prevAvg = avg;
+    const col = diff==null ? 'var(--dim)' : (diff<0 ? 'var(--green)' : (diff>0 ? 'var(--red)' : 'var(--dim)'));
+    return `<div class="mrow"><div><span class="nm">${k.slice(5).replace('-','/')}の週</span><div class="dt">${wk[k].length}回測定</div></div>
+      <div class="amt">${avg.toFixed(cfg.decimals)}${cfg.unit}${diff==null?'':` <span style="color:${col};font-size:11px;">(${diff>=0?'+':'−'}${Math.abs(diff).toFixed(cfg.decimals)})</span>`}</div></div>`;
+  }).join('');
+
+  /* 全記録テーブル（新しい順） */
+  html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">日ごとの全記録（新しい順）</h4>`;
+  html += `<div style="overflow-x:auto;"><table class="t" style="font-size:11px;min-width:520px;"><tr><th>日付</th>` +
+    BODY_COLS.map(c=>`<th style="text-align:right;">${c.label}</th>`).join('') + `<th>測定</th></tr>`;
+  html += [...ws].reverse().map(w=>{
+    const tds = BODY_COLS.map(c=> `<td class="num">${w[c.k]==null?'—':w[c.k].toFixed(c.dec)+c.unit}</td>`).join('');
+    return `<tr><td style="white-space:nowrap;font-weight:700;">${w.dk.slice(5).replace('-','/')}</td>${tds}<td style="color:var(--dim);white-space:nowrap;">${w.time||''}</td></tr>`;
+  }).join('');
+  html += `</table></div>`;
+  html += `<div class="note">体脂肪率・筋肉量などは体組成計の推定値。日々の水分量に左右されるので、単日の上下より週平均の向きで見るのが正解。</div>`;
+
+  openModal(html);
+
+  /* モーダル内チャート（選択中の指標） */
+  const cv = $('modalCanvas');
+  if(cv && window.Chart){
+    const vals = ws.map(w=> w[metric]==null? null : w[metric]);
+    const mov = ws.map((w,i)=>{
+      const win = ws.slice(Math.max(0,i-6), i+1).filter(x=> x[metric]!=null);
+      return win.length ? win.reduce((s,x)=>s+x[metric],0)/win.length : null;
+    });
+    charts['modalChart'] = new Chart(cv,{type:'line',data:{
+      labels: ws.map(w=>w.dk.slice(5).replace('-','/')),
+      datasets:[
+        {label:cfg.label,data:vals,borderColor:cfg.color,backgroundColor:cfg.bg,fill:true,tension:0.25,pointRadius:2,borderWidth:2,spanGaps:true},
+        {label:'7日平均',data:mov,borderColor:'#2E3440',borderDash:[6,4],pointRadius:0,borderWidth:2,tension:0.3,fill:false,spanGaps:true}
+      ]},options:{plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}},
+      scales:{x:{ticks:{color:'#8A93A6',font:{size:9}},grid:{display:false}},
+        y:{ticks:{color:'#8A93A6',font:{size:10},callback:v=>v+cfg.unit},grid:{color:'#EDF0F7'}}}}});
+  }
+}
+window.showBodyHistory = showBodyHistory;
+
+/* ===== PFC・カロリーの推移 ===== */
+function pfcCfg(metric){
+  const G = (typeof GOAL!=='undefined') ? GOAL : {p:140,f:60,c:200,kcal:2000};
+  return ({
+    p:    {label:'たんぱく質', unit:'g',    color:'#43C59E', goal:G.p},
+    f:    {label:'脂質',       unit:'g',    color:'#F5A623', goal:G.f},
+    c:    {label:'炭水化物',   unit:'g',    color:'#8E7CE0', goal:G.c},
+    kcal: {label:'カロリー',   unit:'kcal', color:'#5AB6F2', goal:G.kcal}
+  })[metric];
+}
+function pfcDays(range){
+  const byDay = window.__mealByDay || {};
+  let keys = Object.keys(byDay).sort();
+  /* 記録が極端に少ない日（食べ始め途中の当日など）も推移としては残す */
+  if(range && range>0) keys = keys.slice(-range);
+  return keys;
+}
+function renderPfcChart(metric, range){
+  metric = metric || window.__pfcMetric || 'all';
+  range  = (range===undefined || range===null) ? (window.__pfcRange===undefined ? 30 : window.__pfcRange) : range;
+  window.__pfcMetric = metric; window.__pfcRange = range;
+  const byDay = window.__mealByDay || {};
+  const keys = pfcDays(range);
+  const cv = $('pfcChart');
+  if(!cv) return;
+  if(!keys.length){ if(charts['pfcChart']){charts['pfcChart'].destroy(); delete charts['pfcChart'];} return; }
+  const labels = keys.map(k=>k.slice(5).replace('-','/'));
+  let datasets, yCb;
+
+  if(metric==='all'){
+    datasets = ['p','f','c'].map(k=>{
+      const c = pfcCfg(k);
+      return {label:c.label,data:keys.map(d=>Math.round(byDay[d][k])),borderColor:c.color,backgroundColor:'transparent',tension:0.25,pointRadius:2,borderWidth:2};
+    });
+    yCb = v=>v+'g';
+  } else {
+    const c = pfcCfg(metric);
+    const vals = keys.map(d=>Math.round(byDay[d][metric]));
+    const mov = vals.map((_,i)=>{
+      const win = vals.slice(Math.max(0,i-6), i+1);
+      return Math.round(win.reduce((s,v)=>s+v,0)/win.length);
+    });
+    datasets = [
+      {type:'bar',label:c.label,data:vals,backgroundColor:vals.map(v=> v>c.goal ? 'rgba(232,93,117,0.75)' : 'rgba(67,197,158,0.75)'),borderRadius:4},
+      {type:'line',label:'7日平均',data:mov,borderColor:'#2E3440',borderDash:[6,4],pointRadius:0,borderWidth:2,tension:0.3,fill:false},
+      {type:'line',label:'目標 '+c.goal+c.unit,data:keys.map(()=>c.goal),borderColor:'#B0B7C9',borderDash:[3,3],pointRadius:0,borderWidth:1.5,fill:false}
+    ];
+    yCb = v=>v+(metric==='kcal'?'':'g');
+  }
+
+  if(charts['pfcChart']){ charts['pfcChart'].destroy(); }
+  charts['pfcChart'] = new Chart(cv,{type: metric==='all'?'line':'bar', data:{labels,datasets},
+    options:{plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}},
+    scales:{x:{ticks:{color:'#8A93A6',font:{size:9}},grid:{display:false}},
+      y:{beginAtZero:true,ticks:{color:'#8A93A6',font:{size:10},callback:yCb},grid:{color:'#EDF0F7'}}}}});
+
+  document.querySelectorAll('#pfcMetricToggle .metricBtn').forEach(b=> b.classList.toggle('active', b.dataset.pfc===metric));
+  document.querySelectorAll('#pfcRangeToggle .metricBtn').forEach(b=> b.classList.toggle('active', +b.dataset.range===range));
+
+  /* サマリ: 最多・最少の日と平均 */
+  const note = $('pfcNote');
+  if(note){
+    if(metric==='all'){
+      const n = keys.length;
+      const avg = k=> Math.round(keys.reduce((s,d)=>s+byDay[d][k],0)/n);
+      note.innerHTML = `この期間（${n}日）の平均: <b>P${avg('p')}g / F${avg('f')}g / C${avg('c')}g・${avg('kcal').toLocaleString()}kcal</b>　｜　目標 P${GOAL.p} / F${GOAL.f} / C${GOAL.c}g・${GOAL.kcal.toLocaleString()}kcal。各項目のボタンで、どの日が多かったかを個別に見られます。`;
+    } else {
+      const c = pfcCfg(metric);
+      const vals = keys.map(d=>byDay[d][metric]);
+      const n = vals.length;
+      const avg = vals.reduce((s,v)=>s+v,0)/n;
+      const over = vals.filter(v=>v>c.goal).length;
+      /* 最多・最少は「まだ食べ終わっていない当日」を除いて出す（当日が常に最少になるのを防ぐ） */
+      const tk = window.__todayKey || '';
+      const idx = keys.map((d,i)=>i).filter(i=> keys[i]!==tk);
+      let hi=idx[0], lo=idx[0];
+      idx.forEach(i=>{ if(vals[i]>vals[hi])hi=i; if(vals[i]<vals[lo])lo=i; });
+      const ex = keys.includes(tk) ? '（当日は集計中のため除外）' : '';
+      note.innerHTML = `平均 <b>${Math.round(avg).toLocaleString()}${c.unit}</b>（目標${c.goal.toLocaleString()}${c.unit}）・目標超過は<b>${over}/${n}日</b>　｜　最多 ${keys[hi].slice(5).replace('-','/')} <b>${Math.round(vals[hi]).toLocaleString()}${c.unit}</b>・最少 ${keys[lo].slice(5).replace('-','/')} <b>${Math.round(vals[lo]).toLocaleString()}${c.unit}</b>${ex}。赤い棒が目標超過の日、破線が7日移動平均。`;
+    }
+  }
+}
+function togglePfcMetric(m){ renderPfcChart(m, window.__pfcRange); }
+function togglePfcRange(r){ renderPfcChart(window.__pfcMetric, r); }
+window.togglePfcMetric = togglePfcMetric; window.togglePfcRange = togglePfcRange;
+
+/* PFC KPIカードから: 日ごとのPFC一覧モーダル */
+function showPfcHistory(){
+  const byDay = window.__mealByDay || {};
+  const keys = Object.keys(byDay).sort();
+  if(!keys.length){ openModal('<h3>PFCの推移</h3><div class="sub">まだ食事の記録がありません。</div>'); return; }
+  const n = keys.length;
+  const avg = k=> keys.reduce((s,d)=>s+byDay[d][k],0)/n;
+  let html = `<h3>PFC・カロリーの日ごとの推移</h3><div class="sub">${keys[0]} 〜 ${keys[n-1]}・${n}日分　｜　平均 P${Math.round(avg('p'))}g / F${Math.round(avg('f'))}g / C${Math.round(avg('c'))}g・${Math.round(avg('kcal')).toLocaleString()}kcal（目標 P${GOAL.p}/F${GOAL.f}/C${GOAL.c}g・${GOAL.kcal.toLocaleString()}kcal）</div>`;
+
+  /* 週平均 */
+  const wk = {};
+  keys.forEach(dk=>{
+    const d = new Date(dk+'T00:00:00+09:00');
+    const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay()+6)%7));
+    (wk[mon.toISOString().slice(0,10)] = wk[mon.toISOString().slice(0,10)] || []).push(dk);
+  });
+  html += `<h4 style="font-size:13px;font-weight:900;margin:14px 0 4px;">週ごとの平均</h4>`;
+  html += `<div style="overflow-x:auto;"><table class="t" style="font-size:11.5px;min-width:420px;"><tr><th>週</th><th style="text-align:right;">kcal</th><th style="text-align:right;">P</th><th style="text-align:right;">F</th><th style="text-align:right;">C</th><th style="text-align:right;">日数</th></tr>`;
+  html += Object.keys(wk).sort().map(k=>{
+    const ds = wk[k], m = j=> Math.round(ds.reduce((s,d)=>s+byDay[d][j],0)/ds.length);
+    const kc = m('kcal');
+    const col = kc>GOAL.kcal ? 'var(--red)' : 'var(--green)';
+    return `<tr><td style="white-space:nowrap;font-weight:700;">${k.slice(5).replace('-','/')}〜</td><td class="num" style="color:${col};">${kc.toLocaleString()}</td><td class="num">${m('p')}g</td><td class="num">${m('f')}g</td><td class="num">${m('c')}g</td><td class="num" style="color:var(--dim);">${ds.length}</td></tr>`;
+  }).join('');
+  html += `</table></div>`;
+
+  /* 日ごと（新しい順） */
+  html += `<h4 style="font-size:13px;font-weight:900;margin:16px 0 4px;">日ごと（新しい順・クリックで明細）</h4>`;
+  html += `<div style="overflow-x:auto;"><table class="t" style="font-size:11.5px;min-width:420px;"><tr><th>日付</th><th style="text-align:right;">kcal</th><th style="text-align:right;">P</th><th style="text-align:right;">F</th><th style="text-align:right;">C</th></tr>`;
+  html += [...keys].reverse().map(dk=>{
+    const d = byDay[dk];
+    const col = d.kcal>GOAL.kcal ? 'var(--red)' : 'var(--green)';
+    return `<tr class="clickable" onclick="showMealDay('${dk}')" style="cursor:pointer;"><td style="white-space:nowrap;font-weight:700;">${dk.slice(5).replace('-','/')}</td><td class="num" style="color:${col};">${Math.round(d.kcal).toLocaleString()}</td><td class="num">${Math.round(d.p)}g</td><td class="num">${Math.round(d.f)}g</td><td class="num">${Math.round(d.c)}g</td></tr>`;
+  }).join('');
+  html += `</table></div>`;
+  html += `<div class="note">カロリーが緑なら目標内、赤なら超過。行をクリックするとその日の食事明細が開きます。栄養成分が読めなかった品はPFCが0で入っているため、合計が実際よりやや低く出ることがあります。</div>`;
+  openModal(html);
+}
+window.showPfcHistory = showPfcHistory;
+
 const CAT_COLORS = ['#5AB6F2','#F06E9C','#43C59E','#F5A623','#8E7CE0','#4DD0E1','#FF8A65','#AED581','#BA68C8','#90A4AE','#FFD54F','#7986CB'];
 
 /* ---- 大分類マッピング ---- */
@@ -1677,13 +1903,13 @@ function renderHealth(meal, weight, now){
   now = now || new Date();
   const todayKey = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
 
-  /* --- 体重ログ: 日付/体重kg/体脂肪率%/メモ --- */
+  /* --- 体重ログ: 日付/体重kg/体脂肪率%/メモ/筋肉量kg/体脂肪量kg/基礎代謝kcal/水分量%/BMI/心拍bpm/測定時刻（11列・2026-08-10多列化） --- */
   const ws=[];
   if(weight && weight.length>1){
     for(let i=1;i<weight.length;i++){
       const r=weight[i]; const dk=pd(r[0]); const kg=num(r[1]);
       if(!dk||kg===null) continue;
-      ws.push({dk, kg, fat:num(r[2]), memo:r[3]||'', muscle:num(r[4]), fatMass:num(r[5]), bmr:num(r[6]), water:num(r[7]), bmi:num(r[8])});
+      ws.push({dk, kg, fat:num(r[2]), memo:r[3]||'', muscle:num(r[4]), fatMass:num(r[5]), bmr:num(r[6]), water:num(r[7]), bmi:num(r[8]), hr:num(r[9]), time:r[10]||''});
     }
   }
   ws.sort((a,b)=>a.dk<b.dk?-1:1);
@@ -1764,6 +1990,8 @@ function renderHealth(meal, weight, now){
   /* 食事カレンダー（月めくり式） */
   window.__mealByDay = byDay; window.__todayKey = todayKey;
   if($('mealCal')) renderMealCal(now.getFullYear(), now.getMonth()+1);
+  /* PFC・カロリーの推移チャート */
+  if(dayKeys.length) renderPfcChart(window.__pfcMetric || 'all', window.__pfcRange===undefined ? 30 : window.__pfcRange);
 }
 function renderMealCal(y, m){
   window.__healthYM = {y, m};
