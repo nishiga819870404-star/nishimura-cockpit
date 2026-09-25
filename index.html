@@ -1510,20 +1510,37 @@ async function boot(){
   const get=async(u,l)=>{ if(!u)return null; try{return await fetchCSV(u);}catch(e){errs.push(l+': '+e.message);return null;} };
   const getQuiet=async(u)=>{ if(!u)return null; try{return await fetchCSV(u);}catch(e){return null;} };
   let pre=null;
+  const KEYS=['snap','cf','port','loan','meisai','report','hist','fixed','income','watch','wish','meal','weight'];
   if(CFG.gas){
+    /* 前回のデータを先に出して待ち時間をなくす。最新は裏で取り直して差し替える */
+    let cached=null; try{cached=JSON.parse(localStorage.getItem('nosCache')||'null');}catch(e){}
+    if(cached&&cached.data&&!boot._drawn){
+      /* 画面の部品（後ろのscript）が揃うのを待ってから描く */
+      if(document.readyState==='loading') await new Promise(r=>document.addEventListener('DOMContentLoaded',r,{once:true}));
+      try{
+        const o={}; KEYS.forEach(k=>o[k]=cached.data[k]||null);
+        if(o.snap&&o.cf&&o.port){ render(o); boot._drawn=true; $('app').classList.remove('hidden'); requestAnimationFrame(fitNums); }
+        $('stamp').textContent='前回 '+(cached.at||'')+' ・更新中…';
+      }catch(e){}
+    }
     try{
       const r=await fetch(CFG.gas+'?key='+encodeURIComponent(CFG.key)+'&ts='+Date.now());
       const j=await r.json();
       if(!j.ok) throw new Error(j.error||'読み込み失敗');
       pre=j.data;
+      const at=new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      try{localStorage.setItem('nosCache',JSON.stringify({at,data:pre}));}
+      catch(e){ /* 容量オーバー時は明細を除いて保存 */
+        try{const lite={...pre,meisai:null};localStorage.setItem('nosCache',JSON.stringify({at,data:lite}));}catch(e2){}
+      }
     }catch(e){errs.push('受付窓口: '+(e.message||e));}
   }
-  const [snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish,meal,weight]=CFG.gas ? ['snap','cf','port','loan','meisai','report','hist','fixed','income','watch','wish','meal','weight'].map(k=>pre&&pre[k]||null) : await Promise.all([
+  const [snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish,meal,weight]=CFG.gas ? KEYS.map(k=>pre&&pre[k]||null) : await Promise.all([
     get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート'),get(CFG.hist,'配当履歴'),get(CFG.fixed,'固定費'),get(CFG.income,'収入明細'),get(CFG.watch,'ウォッチリスト'),get(CFG.wish,'欲しいものリスト'),getQuiet(CFG.meal),getQuiet(CFG.weight)
   ]);
   if(errs.length) $('errbox').innerHTML='<div class="err">読み込みエラー: '+errs.join(' / ')+'<br>'+(CFG.gas?'⚙設定の受付窓口URLと合言葉を確認してください。':'URLが「ウェブに公開」のCSV形式か確認してください。')+'</div>';
   else if(CFG.gas && pre && (!snap||!cf||!port)) $('errbox').innerHTML='<div class="err">スプシに「資産スナップショット」「月次収支」「ポートフォリオ」のどれかが見つかりません。gas/Code.gs の SHEETS のシート名を実際の名前に合わせてください。</div>';
-  if(!snap||!cf||!port){$('app').classList.remove('hidden');return;}
+  if(!snap||!cf||!port){$('app').classList.remove('hidden');if(boot._drawn&&errs.length)$('stamp').textContent='前回のデータを表示中';return;}
   try{
     render({snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish,meal,weight});
     $('stamp').textContent='更新: '+new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
