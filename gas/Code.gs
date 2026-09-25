@@ -32,14 +32,16 @@ const SHEETS = {
   meal: '食事ログ',
   weight: '体重ログ',
   kabuhist: '株価履歴',
-  inbox: '受信箱'
+  inbox: '受信箱',
+  presets: 'いつもの'
 };
 
 /* 無ければ自動で作るシートと見出し行 */
 const HEADERS = {
   '体重ログ': ['日付', '体重kg', '体脂肪率%', 'メモ', '筋肉量kg', '体脂肪量kg', '基礎代謝kcal', '水分量%', 'BMI', '心拍bpm', '測定時刻'],
   '食事ログ': ['日付', '時刻', '区分', '内容', '推定カロリー', 'P', 'F', 'C', '根拠', 'メモ'],
-  '受信箱': ['受信日時', '種類', '内容', '写真', '状態']
+  '受信箱': ['受信日時', '種類', '内容', '写真', '状態'],
+  'いつもの': ['名前', 'kcal', 'P', 'F', 'C']
 };
 
 const PHOTO_FOLDER = '西村OS写真';
@@ -70,6 +72,8 @@ function doPost(e) {
     switch (body.type) {
       case 'weight': return json_(addWeight_(body));
       case 'memo': return json_(addInbox_('メモ', body.text || '', ''));
+      case 'meal': return json_(addMeal_(body));
+      case 'preset': return json_(addPreset_(body));
       case 'photo': return json_(addPhoto_(body));
       case 'photoDone': return json_(photoDone_(body));
       default: return json_({ ok: false, error: '不明な種類: ' + body.type });
@@ -96,6 +100,36 @@ function addWeight_(b) {
   const fat = num_(b.fat);
   sh.appendRow([date, kg, fat === null ? '' : fat, b.memo || b.source || '', '', '', '', '', num_(b.bmi) === null ? '' : num_(b.bmi), '', b.time || '']);
   return { ok: true, message: date + ' ' + kg.toFixed(1) + 'kg を記録しました' };
+}
+
+/* ================= 食事（テキスト・いつもの） ================= */
+
+/* {items, meal_type?, date?, kcal?, p?, f?, c?}
+   カロリーが分かっている（いつもの）→ 食事ログに即記録。分からない → 受信箱に「未読取」で置き、定期実行が見積もる */
+function addMeal_(b) {
+  const items = String(b.items || '').trim();
+  if (!items) return { ok: false, error: '食べたものが空です' };
+  const d = new Date();
+  const date = normDate_(b.date) || today_();
+  const type = b.meal_type || mealType_(d);
+  if (num_(b.kcal) !== null) {
+    sheet_('食事ログ').appendRow([date, Utilities.formatDate(d, TZ, 'HH:mm'), type, items, num_(b.kcal), num_(b.p), num_(b.f), num_(b.c), 'いつもの', '']);
+    return { ok: true, message: items + ' ' + Math.round(num_(b.kcal)) + 'kcal を記録しました' };
+  }
+  sheet_('受信箱').appendRow([now_(), '食事(テキスト)', '[' + type + '] ' + items, '', '未読取']);
+  return { ok: true, message: '記録しました。カロリーは次の自動読み取り（朝・昼・夜）で入ります' };
+}
+
+function addPreset_(b) {
+  const name = String(b.name || '').trim();
+  if (!name || num_(b.kcal) === null) return { ok: false, error: '名前とkcalを入れてください' };
+  const sh = sheet_('いつもの');
+  const rows = sh.getDataRange().getDisplayValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === name) { sh.getRange(i + 1, 2, 1, 4).setValues([[num_(b.kcal), num_(b.p), num_(b.f), num_(b.c)]]); return { ok: true, message: '「' + name + '」を更新しました' }; }
+  }
+  sh.appendRow([name, num_(b.kcal), num_(b.p), num_(b.f), num_(b.c)]);
+  return { ok: true, message: '「' + name + '」をいつものに登録しました' };
 }
 
 /* ================= メモ・受信箱 ================= */
@@ -255,6 +289,10 @@ function pendingPhotos_(limit) {
   const items = [];
   for (let i = 1; i < rows.length && items.length < limit; i++) {
     if (rows[i][4] !== '未読取') continue;
+    if (rows[i][1] === '食事(テキスト)') {
+      items.push({ row: i + 1, kind: 'mealText', note: rows[i][2], received: rows[i][0] });
+      continue;
+    }
     const id = (String(rows[i][3]).match(/[-\w]{25,}/) || [])[0];
     if (!id) continue;
     const blob = DriveApp.getFileById(id).getBlob();
@@ -278,7 +316,7 @@ function photoDone_(b) {
   let msg = '';
   if (b.meal) {
     const m = b.meal;
-    sheet_('食事ログ').appendRow([date, received.slice(11, 16), m.meal_type || '', m.items || '', num_(m.kcal), num_(m.protein_g), num_(m.fat_g), num_(m.carb_g), m.basis || '', sh.getRange(row, 4).getDisplayValue()]);
+    sheet_('食事ログ').appendRow([date, received.slice(11, 16), m.meal_type || '', m.items || '', num_(m.kcal), num_(m.protein_g), num_(m.fat_g), num_(m.carb_g), m.basis || '', sh.getRange(row, 4).getDisplayValue() || 'テキストから']);
     msg = '食事ログに記録';
   } else if (b.weight) {
     const r = addWeight_({ kg: b.weight.kg, fat: b.weight.fat, bmi: b.weight.bmi, date: b.weight.date || date, memo: '写真から' });
