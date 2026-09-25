@@ -9,7 +9,9 @@
  *
  * 設定（プロジェクトの設定 → スクリプト プロパティ）:
  *   KEY               … 合言葉。西村OSとiPhoneショートカットに同じものを入れる（必須）
- *   ANTHROPIC_API_KEY … 写真の自動読み取りを使う場合のみ（任意。無ければ写真は保存だけ）
+ *   ANTHROPIC_API_KEY … 任意。入れるとその場でClaude APIが写真を読む（従量課金）。
+ *                       入れない場合は「未読取」で受信箱に溜まり、クラウドの定期実行（Maxプランの範囲）が
+ *                       ?pending=1 で受け取り、type:'photoDone' で結果を書き戻す
  *
  * 手順は gas/README.md を参照。
  */
@@ -50,6 +52,7 @@ function doGet(e) {
   const p = (e && e.parameter) || {};
   if (!checkKey_(p.key)) return json_({ ok: false, error: '合言葉が違います' });
   if (p.ping) return json_({ ok: true, sheets: listSheets_() });
+  if (p.pending) return json_(pendingPhotos_(parseInt(p.limit, 10) || 5));
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const data = {};
   Object.keys(SHEETS).forEach(function (k) {
@@ -68,6 +71,7 @@ function doPost(e) {
       case 'weight': return json_(addWeight_(body));
       case 'memo': return json_(addInbox_('メモ', body.text || '', ''));
       case 'photo': return json_(addPhoto_(body));
+      case 'photoDone': return json_(photoDone_(body));
       default: return json_({ ok: false, error: '不明な種類: ' + body.type });
     }
   } catch (err) {
@@ -114,9 +118,14 @@ function addPhoto_(b) {
   const url = file.getUrl();
 
   const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
-  if (!apiKey || kind === 'other') {
-    addInbox_('写真(' + kindLabel_(kind) + ')', b.note || '', url);
-    return { ok: true, message: apiKey ? '写真を受信箱に保存しました' : '写真を保存しました（自動読み取りは未設定）' };
+  if (kind === 'other') {
+    addInbox_('写真(その他)', b.note || '', url);
+    return { ok: true, message: '写真を受信箱に保存しました' };
+  }
+  if (!apiKey || kind === 'asset') {
+    // APIキー無し（資産スクショは常にこちら） → 定期実行（Maxプラン）が後で読む
+    sheet_('受信箱').appendRow([now_(), '写真(' + kindLabel_(kind) + ')', b.note || '', url, '未読取']);
+    return { ok: true, message: '写真を保存しました。次の自動読み取り（朝・昼・夜）で反映されます' };
   }
 
   const r = readPhoto_(apiKey, kind, b.data, mime, b.note || '');
@@ -231,7 +240,70 @@ function num_(v) {
   const n = parseFloat(String(v).replace(/[^\d.\-]/g, ''));
   return isNaN(n) ? null : n;
 }
-function kindLabel_(k) { return { meal: '食事', scale: '体重計', other: 'その他' }[k] || k; }
+function kindLabel_(k) { return { meal: '食事', scale: '体重計', asset: '資産', other: 'その他' }[k] || k; }
+function labelKind_(label) {
+  const m = String(label).match(/写真\((.+?)\)/);
+  const map = { '食事': 'meal', '体重計': 'scale', '資産': 'asset' };
+  return m ? (map[m[1]] || 'other') : 'other';
+}
+
+/* ================= 定期実行（Maxプラン）向け：読み取り待ちの写真 ================= */
+
+function pendingPhotos_(limit) {
+  const sh = sheet_('受信箱');
+  const rows = sh.getDataRange().getDisplayValues();
+  const items = [];
+  for (let i = 1; i < rows.length && items.length < limit; i++) {
+    if (rows[i][4] !== '未読取') continue;
+    const id = (String(rows[i][3]).match(/[-\w]{25,}/) || [])[0];
+    if (!id) continue;
+    const blob = DriveApp.getFileById(id).getBlob();
+    items.push({
+      row: i + 1, kind: labelKind_(rows[i][1]), note: rows[i][2], received: rows[i][0],
+      mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes())
+    });
+  }
+  let left = 0;
+  for (let i = 1; i < rows.length; i++) if (rows[i][4] === '未読取') left++;
+  return { ok: true, items: items, left: left, snapHeader: headerOf_('snap') };
+}
+
+/* 読み取り結果の書き戻し。{row, meal:{...}} / {row, weight:{kg,fat,bmi}} / {row, snapRow:[...]} / {row, text:'...'} */
+function photoDone_(b) {
+  const sh = sheet_('受信箱');
+  const row = parseInt(b.row, 10);
+  if (!(row > 1) || sh.getRange(row, 5).getValue() !== '未読取') return { ok: false, error: 'その行は読み取り待ちではありません: ' + b.row };
+  const received = String(sh.getRange(row, 1).getDisplayValue());
+  const date = normDate_(received) || today_();
+  let msg = '';
+  if (b.meal) {
+    const m = b.meal;
+    sheet_('食事ログ').appendRow([date, received.slice(11, 16), m.meal_type || '', m.items || '', num_(m.kcal), num_(m.protein_g), num_(m.fat_g), num_(m.carb_g), m.basis || '', sh.getRange(row, 4).getDisplayValue()]);
+    msg = '食事ログに記録';
+  } else if (b.weight) {
+    const r = addWeight_({ kg: b.weight.kg, fat: b.weight.fat, bmi: b.weight.bmi, date: b.weight.date || date, memo: '写真から' });
+    if (!r.ok) return r;
+    msg = r.message;
+  } else if (b.snapRow) {
+    const name = SHEETS.snap;
+    const target = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+    if (!target) return { ok: false, error: name + ' シートがありません' };
+    target.appendRow(b.snapRow);
+    msg = name + 'に1行追加';
+  } else if (!b.text) {
+    return { ok: false, error: '結果がありません' };
+  }
+  sh.getRange(row, 5).setValue('処理済');
+  if (b.text) sh.getRange(row, 3).setValue((sh.getRange(row, 3).getValue() ? sh.getRange(row, 3).getValue() + ' / ' : '') + b.text);
+  return { ok: true, message: msg || '受信箱にメモしました' };
+}
+
+function headerOf_(key) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS[key]);
+  if (!sh) return null;
+  const v = sh.getDataRange().getDisplayValues();
+  return { header: v[0], last: v.length > 1 ? v[v.length - 1] : null };
+}
 function mealType_(d) {
   const h = parseInt(Utilities.formatDate(d, TZ, 'H'), 10);
   return h < 10 ? '朝食' : h < 15 ? '昼食' : h < 21 ? '夕食' : '間食';
