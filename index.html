@@ -1022,11 +1022,18 @@ canvas{max-width:100%;}
       </div>
     </section>
     <script>
-    fetch('./radar.json?ts='+Date.now()).then(r=>r.ok?r.json():null).then(j=>{
-      if(!j||!j.entries||!j.entries.length)return;
+    /* radar.json（公開）＋ スプシ受信箱の「レーダー」行（非公開・配当/優待レーダーの結果）をまとめて表示 */
+    let radarJson=[];
+    window.__radarRender=function(){
       const esc=t=>String(t==null?'':t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-      const COL={'優待レーダー':'#43C59E','ポケカレーダー':'#8E7CE0','システム':'#8A93A6'};
-      const es=[...j.entries].sort((a,b)=>a.date<b.date?1:-1);
+      const COL={'優待レーダー':'#43C59E','ポケカレーダー':'#8E7CE0','システム':'#8A93A6','配当・優待レーダー':'#F5A623'};
+      const ib=(window.__nosData&&window.__nosData.inbox)||[];
+      const fromSheet=ib.slice(1).filter(r=>r[1]==='レーダー').map(r=>{
+        const m=String(r[2]).match(/^【(.+?)】([\s\S]*)$/);
+        return {date:String(r[0]).slice(0,10).replace(/\//g,'-'),source:'配当・優待レーダー',title:m?m[1]:'レーダー結果',body:m?m[2]:r[2]};
+      });
+      const all=radarJson.concat(fromSheet); if(!all.length)return;
+      const es=all.sort((a,b)=>a.date<b.date?1:-1);
       document.getElementById('radarList').innerHTML=es.map(e=>
         '<div style="padding:11px 2px;border-bottom:1px solid var(--line)">'
         +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:3px">'
@@ -1035,6 +1042,9 @@ canvas{max-width:100%;}
         +'<span style="margin-left:auto;font-size:11px;color:var(--dim)">'+esc(e.date)+'</span></div>'
         +(e.body?'<div style="font-size:12.5px;color:var(--dim);line-height:1.7;white-space:pre-wrap">'+esc(e.body)+'</div>':'')
         +'</div>').join('');
+    };
+    fetch('./radar.json?ts='+Date.now()).then(r=>r.ok?r.json():null).then(j=>{
+      radarJson=(j&&j.entries)||[]; window.__radarRender();
     }).catch(()=>{});
     </script>
 
@@ -1587,7 +1597,7 @@ async function boot(){
       const r=await fetch(CFG.gas+'?key='+encodeURIComponent(CFG.key)+'&ts='+Date.now());
       const j=await r.json();
       if(!j.ok) throw new Error(j.error||'読み込み失敗');
-      pre=j.data; window.__nosData=pre;
+      pre=j.data; window.__nosData=pre; if(window.__radarRender) try{window.__radarRender();}catch(e){}
       const at=new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
       try{localStorage.setItem('nosCache',JSON.stringify({at,data:pre}));}
       catch(e){ /* 容量オーバー時は明細を除いて保存 */
@@ -2862,7 +2872,7 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
 #qSheet.hidden{display:none;}
 #qSheet .qbox{background:var(--card);width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));}
 #qSheet .qtabs{display:flex;gap:6px;margin-bottom:14px;}
-#qSheet .qtabs button{flex:1;padding:10px 0;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:14px;font-weight:700;color:var(--text);cursor:pointer;}
+#qSheet .qtabs button{flex:1;padding:10px 0;white-space:nowrap;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:14px;font-weight:700;color:var(--text);cursor:pointer;}
 #qSheet .qtabs button.on{background:var(--header);color:#fff;border-color:var(--header);}
 #qSheet input,#qSheet textarea,#qSheet select{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:var(--card);color:var(--text);margin-bottom:10px;font-family:inherit;}
 #qSheet .qsend{width:100%;padding:14px;border:none;border-radius:12px;background:var(--header);color:#fff;font-size:16px;font-weight:700;cursor:pointer;}
@@ -2878,6 +2888,9 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
 #qSheet .qpre-label{font-size:12px;color:var(--dim);margin-bottom:6px;}
 #qSheet .qpre-add{margin-bottom:10px;font-size:13px;}
 #qSheet .qpre-add summary{cursor:pointer;color:var(--header);font-weight:700;margin-bottom:8px;}
+#qSheet .qrec{display:inline-flex;gap:0;}
+#qSheet .qrec button:first-child{border-radius:999px 0 0 999px;}
+#qSheet .qrec .qstar{border-radius:0 999px 999px 0;border-left:none;padding:7px 9px;}
 #qSheet .qpre-row2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
 #qSheet .qpre-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
 #qPreview{max-width:100%;max-height:180px;border-radius:10px;display:none;margin-bottom:10px;}
@@ -2889,6 +2902,7 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
       <button data-q="photo" class="on">📷 写真</button>
       <button data-q="meal">🍚 食事</button>
       <button data-q="weight">⚖️ 体重</button>
+      <button data-q="trade">📈 売買</button>
       <button data-q="memo">📝 メモ</button>
     </div>
     <div data-qp="photo">
@@ -2919,6 +2933,10 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
     <div data-qp="weight" hidden>
       <input type="number" id="qKg" inputmode="decimal" step="0.1" placeholder="体重 kg（例: 102.3）">
       <input type="number" id="qFat" inputmode="decimal" step="0.1" placeholder="体脂肪率 %（任意）">
+    </div>
+    <div data-qp="trade" hidden>
+      <textarea id="qTrade" rows="3" placeholder="例：トヨタ(7203) 100株 2,500円で買った SBI&#10;例：KDDI 全部売った 4,800円"></textarea>
+      <div class="qpre-label">書いた内容を次の自動読み取りでClaudeがポートフォリオと取引履歴に反映します。証券アプリのスクショなら「📷写真 → 📈資産」でもOK</div>
     </div>
     <div data-qp="memo" hidden>
       <textarea id="qText" rows="4" placeholder="なんでも。あとで整理します"></textarea>
@@ -2958,9 +2976,20 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
   };
   const drawRecent=()=>{
     const rs=recent();
-    $q('qRecent').innerHTML=rs.length?rs.map(x=>'<button type="button" data-n="'+x.name.replace(/"/g,'&quot;')+'" class="'+(pickedR[x.name]?'on':'')+'">'+x.name.replace(/</g,'&lt;')+' <small>'+Math.round(x.kcal)+'kcal</small></button>').join(''):'<span style="font-size:12px;color:var(--dim)">記録がたまると、ここに並びます</span>';
+    $q('qRecent').innerHTML=rs.length?rs.map(x=>'<span class="qrec"><button type="button" data-n="'+x.name.replace(/"/g,'&quot;')+'" class="'+(pickedR[x.name]?'on':'')+'">'+x.name.replace(/</g,'&lt;')+' <small>'+Math.round(x.kcal)+'kcal</small></button><button type="button" class="qstar" data-star="'+x.name.replace(/"/g,'&quot;')+'" aria-label="いつものに登録" title="いつものに登録">⭐</button></span>').join(''):'<span style="font-size:12px;color:var(--dim)">記録がたまると、ここに並びます</span>';
   };
-  $q('qRecent').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const n=b.dataset.n;if(pickedR[n])delete pickedR[n];else pickedR[n]=1;drawRecent();});
+  $q('qRecent').addEventListener('click',async e=>{
+    const st=e.target.closest('[data-star]');
+    if(st){
+      const x=recent().find(r=>r.name===st.dataset.star); if(!x) return;
+      try{
+        const j=await post({type:'preset',name:x.name,kcal:x.kcal,p:x.p,f:x.f,c:x.c});
+        const d=window.__nosData=window.__nosData||{}; d.presets=(d.presets&&d.presets.length?d.presets:[['名前','kcal','P','F','C']]).filter(r=>r[0]!==x.name).concat([[x.name,x.kcal,x.p,x.f,x.c]]);
+        delete pickedR[x.name]; drawPresets(); drawRecent(); $q('qMsg').textContent='⭐ '+j.message;
+      }catch(err){$q('qMsg').textContent='⚠️ '+(err.message||err);}
+      return;
+    }
+    const b=e.target.closest('button');if(!b)return;const n=b.dataset.n;if(pickedR[n])delete pickedR[n];else pickedR[n]=1;drawRecent();});
   const dayStr=id=>{const d=new Date();d.setDate(d.getDate()-(+$q(id).value||0));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
   $q('qPresets').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const n=b.dataset.n;if(picked[n])delete picked[n];else picked[n]=1;drawPresets();});
   const open=()=>{
@@ -3020,6 +3049,9 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
     }else if(mode==='weight'){
       if(!$q('qKg').value){$q('qMsg').textContent='体重を入れてください';return;}
       jobs.push({type:'weight',kg:$q('qKg').value,fat:$q('qFat').value,source:'手入力'});
+    }else if(mode==='trade'){
+      if(!$q('qTrade').value.trim()){$q('qMsg').textContent='売買の内容を書いてください';return;}
+      jobs.push({type:'trade',text:$q('qTrade').value.trim()});
     }else{
       if(!$q('qText').value.trim()){$q('qMsg').textContent='メモを入れてください';return;}
       jobs.push({type:'memo',text:$q('qText').value.trim()});
@@ -3030,7 +3062,7 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
       for(const b of jobs){ const j=await post(b); done.push(j.message||'記録しました'); }
       $q('qMsg').textContent='✅ '+(done.length>1?done.length+'件：':'')+done[done.length-1];
       photos=[]; picked={}; pickedR={}; drawRecent(); $q('qFile').value=''; $q('qPreview').style.display='none';
-      ['qNote','qKg','qFat','qText','qMealText'].forEach(id=>$q(id).value=''); drawPresets();
+      ['qNote','qKg','qFat','qText','qMealText','qTrade'].forEach(id=>$q(id).value=''); drawPresets();
       if(typeof boot==='function') setTimeout(boot,500);
     }catch(e){
       $q('qMsg').textContent='⚠️ '+(done.length?done.length+'件は記録済み。残りで失敗：':'')+(e.message||e)+'（時間をおいてもう一度）';
