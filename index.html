@@ -2886,6 +2886,7 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
       <div class="qkinds">
         <label><input type="radio" name="qkind" value="meal" checked>🍚 食事</label>
         <label><input type="radio" name="qkind" value="scale">⚖️ 体重計</label>
+        <label><input type="radio" name="qkind" value="asset">📈 資産</label>
         <label><input type="radio" name="qkind" value="other">📎 その他</label>
       </div>
       <input type="file" id="qFile" accept="image/*">
@@ -2949,7 +2950,7 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
       if(!body.text){$q('qMsg').textContent='メモを入れてください';return;}
     }
     $q('qSend').disabled=true;
-    $q('qMsg').textContent=mode==='photo'&&body.kind!=='other'?'送信中…（写真の読み取りに10〜30秒かかります）':'送信中…';
+    $q('qMsg').textContent='送信中…';
     try{
       /* text/plain で送る（Apps Scriptはプリフライト非対応のため） */
       const r=await fetch(CFG.gas,{method:'POST',body:JSON.stringify(body)});
