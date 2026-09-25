@@ -112,11 +112,16 @@ function addMeal_(b) {
   const d = new Date();
   const date = normDate_(b.date) || today_();
   const type = b.meal_type || mealType_(d);
+  // 過去に同じ内容を記録していれば、その値でその場で記録（写真から読み取った分も含む）
+  if (num_(b.kcal) === null) {
+    const past = findPastMeal_(items);
+    if (past) { b.kcal = past.kcal; b.p = past.p; b.f = past.f; b.c = past.c; b.basis = '過去の記録から'; }
+  }
   if (num_(b.kcal) !== null) {
-    sheet_('食事ログ').appendRow([date, Utilities.formatDate(d, TZ, 'HH:mm'), type, items, num_(b.kcal), num_(b.p), num_(b.f), num_(b.c), 'いつもの', '']);
+    sheet_('食事ログ').appendRow([date, Utilities.formatDate(d, TZ, 'HH:mm'), type, items, num_(b.kcal), num_(b.p), num_(b.f), num_(b.c), b.basis || 'いつもの', '']);
     return { ok: true, message: items + ' ' + Math.round(num_(b.kcal)) + 'kcal を記録しました' };
   }
-  sheet_('受信箱').appendRow([now_(), '食事(テキスト)', '[' + type + '] ' + items, '', '未読取']);
+  sheet_('受信箱').appendRow([stamp_(b.date), '食事(テキスト)', '[' + type + '] ' + items, '', '未読取']);
   return { ok: true, message: '記録しました。カロリーは次の自動読み取り（朝・昼・夜）で入ります' };
 }
 
@@ -158,7 +163,7 @@ function addPhoto_(b) {
   }
   if (!apiKey || kind === 'asset') {
     // APIキー無し（資産スクショは常にこちら） → 定期実行（Maxプラン）が後で読む
-    sheet_('受信箱').appendRow([now_(), '写真(' + kindLabel_(kind) + ')', b.note || '', url, '未読取']);
+    sheet_('受信箱').appendRow([stamp_(b.date), '写真(' + kindLabel_(kind) + ')', b.note || '', url, '未読取']);
     return { ok: true, message: '写真を保存しました。次の自動読み取り（朝・昼・夜）で反映されます' };
   }
 
@@ -262,6 +267,23 @@ function photoFolder_() {
 function listSheets_() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheets().map(function (s) { return s.getName(); });
 }
+/* 受信日時。食べた日を「昨日」にした場合はその日付＋今の時刻（読み取り時もこの日付で記録される） */
+function stamp_(date) {
+  const d = normDate_(date);
+  return d ? d + ' ' + Utilities.formatDate(new Date(), TZ, 'HH:mm') : now_();
+}
+function findPastMeal_(items) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('食事ログ');
+  if (!sh) return null;
+  const rows = sh.getDataRange().getDisplayValues();
+  const key = String(items).replace(/\s/g, '');
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][3]).replace(/\s/g, '') === key && num_(rows[i][4]) !== null) {
+      return { kcal: num_(rows[i][4]), p: num_(rows[i][5]), f: num_(rows[i][6]), c: num_(rows[i][7]) };
+    }
+  }
+  return null;
+}
 function now_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm'); }
 function today_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'); }
 function normDate_(s) {
@@ -316,7 +338,7 @@ function photoDone_(b) {
   let msg = '';
   if (b.meal) {
     const m = b.meal;
-    sheet_('食事ログ').appendRow([date, received.slice(11, 16), m.meal_type || '', m.items || '', num_(m.kcal), num_(m.protein_g), num_(m.fat_g), num_(m.carb_g), m.basis || '', sh.getRange(row, 4).getDisplayValue() || 'テキストから']);
+    sheet_('食事ログ').appendRow([date, (received.match(/\d{1,2}:\d{2}/) || [''])[0], m.meal_type || '', m.items || '', num_(m.kcal), num_(m.protein_g), num_(m.fat_g), num_(m.carb_g), m.basis || '', sh.getRange(row, 4).getDisplayValue() || 'テキストから']);
     msg = '食事ログに記録';
   } else if (b.weight) {
     const r = addWeight_({ kg: b.weight.kg, fat: b.weight.fat, bmi: b.weight.bmi, date: b.weight.date || date, memo: '写真から' });

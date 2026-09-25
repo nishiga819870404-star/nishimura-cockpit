@@ -2878,6 +2878,7 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
 #qSheet .qpre-label{font-size:12px;color:var(--dim);margin-bottom:6px;}
 #qSheet .qpre-add{margin-bottom:10px;font-size:13px;}
 #qSheet .qpre-add summary{cursor:pointer;color:var(--header);font-weight:700;margin-bottom:8px;}
+#qSheet .qpre-row2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
 #qSheet .qpre-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
 #qPreview{max-width:100%;max-height:180px;border-radius:10px;display:none;margin-bottom:10px;}
 </style>
@@ -2897,14 +2898,17 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
         <label><input type="radio" name="qkind" value="asset">📈 資産</label>
         <label><input type="radio" name="qkind" value="other">📎 その他</label>
       </div>
+<select id="qPhotoDay" class="qday"><option value="0">今日の分</option><option value="1">昨日の分</option></select>
       <input type="file" id="qFile" accept="image/*" multiple>
       <img id="qPreview" alt="">
       <input type="text" id="qNote" placeholder="ひとこと（任意）例: 大盛り、半分残した">
     </div>
     <div data-qp="meal" hidden>
-      <select id="qMealType"><option>朝食</option><option>昼食</option><option>夕食</option><option>間食</option></select>
+      <div class="qpre-row2"><select id="qMealDay" class="qday"><option value="0">今日の分</option><option value="1">昨日の分</option></select><select id="qMealType"><option>朝食</option><option>昼食</option><option>夕食</option><option>間食</option></select></div>
       <div class="qpre-label">いつもの（タップで追加・もう一度で外す）</div>
       <div id="qPresets" class="qpresets"></div>
+      <div class="qpre-label">最近食べたもの（すぐ記録されます）</div>
+      <div id="qRecent" class="qpresets"></div>
       <textarea id="qMealText" rows="2" placeholder="ほかに食べたもの（例：おにぎり2個、唐揚げ3個）"></textarea>
       <details class="qpre-add"><summary>＋「いつもの」を登録する</summary>
         <input id="qpName" placeholder="名前（例：プロテイン）">
@@ -2941,10 +2945,27 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
     const ps=presets();
     $q('qPresets').innerHTML=ps.length?ps.map(x=>'<button type="button" data-n="'+x.name.replace(/"/g,'&quot;')+'" class="'+(picked[x.name]?'on':'')+'">'+x.name.replace(/</g,'&lt;')+' <small>'+x.kcal+'kcal</small></button>').join(''):'<span style="font-size:12px;color:var(--dim)">まだありません。下の「＋いつものを登録する」から追加できます</span>';
   };
+  let pickedR={};
+  const recent=()=>{
+    const rows=(window.__nosData&&window.__nosData.meal)||[], pn={}, seen={}, out=[];
+    presets().forEach(x=>pn[x.name]=1);
+    for(let i=rows.length-1;i>=1&&out.length<12;i--){
+      const r=rows[i], name=(r[3]||'').trim(), k=parseFloat(String(r[4]).replace(/[^\d.]/g,''));
+      if(!name||isNaN(k)||pn[name]||seen[name]) continue;
+      seen[name]=1; out.push({name,kcal:k,p:r[5],f:r[6],c:r[7]});
+    }
+    return out;
+  };
+  const drawRecent=()=>{
+    const rs=recent();
+    $q('qRecent').innerHTML=rs.length?rs.map(x=>'<button type="button" data-n="'+x.name.replace(/"/g,'&quot;')+'" class="'+(pickedR[x.name]?'on':'')+'">'+x.name.replace(/</g,'&lt;')+' <small>'+Math.round(x.kcal)+'kcal</small></button>').join(''):'<span style="font-size:12px;color:var(--dim)">記録がたまると、ここに並びます</span>';
+  };
+  $q('qRecent').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const n=b.dataset.n;if(pickedR[n])delete pickedR[n];else pickedR[n]=1;drawRecent();});
+  const dayStr=id=>{const d=new Date();d.setDate(d.getDate()-(+$q(id).value||0));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
   $q('qPresets').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const n=b.dataset.n;if(picked[n])delete picked[n];else picked[n]=1;drawPresets();});
   const open=()=>{
     if(typeof CFG==='undefined'||!CFG||!CFG.gas){alert('先に ⚙設定 で受付窓口URLと合言葉を入れてください');return;}
-    $q('qMsg').textContent='';$q('qMealType').value=autoType();drawPresets();$q('qSheet').classList.remove('hidden');
+    $q('qMsg').textContent='';$q('qMealType').value=autoType();$q('qMealDay').value='0';$q('qPhotoDay').value='0';drawPresets();drawRecent();$q('qSheet').classList.remove('hidden');
   };
   const close=()=>$q('qSheet').classList.add('hidden');
   $q('qFab').addEventListener('click',open);
@@ -2988,12 +3009,14 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
     if(mode==='photo'){
       if(!photos.length){$q('qMsg').textContent='写真を選んでください';return;}
       const kind=document.querySelector('input[name=qkind]:checked').value, note=$q('qNote').value.trim();
-      photos.forEach(data=>jobs.push({type:'photo',data,mime:'image/jpeg',kind,note}));
+      const date=dayStr('qPhotoDay');
+      photos.forEach(data=>jobs.push({type:'photo',data,mime:'image/jpeg',kind,note,date}));
     }else if(mode==='meal'){
-      const t=$q('qMealType').value, ps=presets().filter(x=>picked[x.name]), txt=$q('qMealText').value.trim();
-      if(!ps.length&&!txt){$q('qMsg').textContent='いつものを選ぶか、食べたものを書いてください';return;}
-      ps.forEach(x=>jobs.push({type:'meal',meal_type:t,items:x.name,kcal:x.kcal,p:x.p,f:x.f,c:x.c}));
-      if(txt) jobs.push({type:'meal',meal_type:t,items:txt});
+      const t=$q('qMealType').value, date=dayStr('qMealDay'), ps=presets().filter(x=>picked[x.name]), rs=recent().filter(x=>pickedR[x.name]), txt=$q('qMealText').value.trim();
+      if(!ps.length&&!rs.length&&!txt){$q('qMsg').textContent='いつもの・最近食べたものを選ぶか、食べたものを書いてください';return;}
+      ps.forEach(x=>jobs.push({type:'meal',meal_type:t,date,items:x.name,kcal:x.kcal,p:x.p,f:x.f,c:x.c}));
+      rs.forEach(x=>jobs.push({type:'meal',meal_type:t,date,items:x.name,kcal:x.kcal,p:x.p,f:x.f,c:x.c,basis:'最近の記録'}));
+      if(txt) jobs.push({type:'meal',meal_type:t,date,items:txt});
     }else if(mode==='weight'){
       if(!$q('qKg').value){$q('qMsg').textContent='体重を入れてください';return;}
       jobs.push({type:'weight',kg:$q('qKg').value,fat:$q('qFat').value,source:'手入力'});
@@ -3006,7 +3029,7 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
     try{
       for(const b of jobs){ const j=await post(b); done.push(j.message||'記録しました'); }
       $q('qMsg').textContent='✅ '+(done.length>1?done.length+'件：':'')+done[done.length-1];
-      photos=[]; picked={}; $q('qFile').value=''; $q('qPreview').style.display='none';
+      photos=[]; picked={}; pickedR={}; drawRecent(); $q('qFile').value=''; $q('qPreview').style.display='none';
       ['qNote','qKg','qFat','qText','qMealText'].forEach(id=>$q(id).value=''); drawPresets();
       if(typeof boot==='function') setTimeout(boot,500);
     }catch(e){
