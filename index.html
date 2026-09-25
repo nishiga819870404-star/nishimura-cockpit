@@ -1578,7 +1578,7 @@ async function boot(){
       /* 画面の部品（後ろのscript）が揃うのを待ってから描く */
       if(document.readyState==='loading') await new Promise(r=>document.addEventListener('DOMContentLoaded',r,{once:true}));
       try{
-        const o={}; KEYS.forEach(k=>o[k]=cached.data[k]||null);
+        window.__nosData=cached.data; const o={}; KEYS.forEach(k=>o[k]=cached.data[k]||null);
         if(o.snap&&o.cf&&o.port){ render(o); boot._drawn=true; $('app').classList.remove('hidden'); requestAnimationFrame(fitNums); }
         $('stamp').textContent='前回 '+(cached.at||'')+' ・更新中…';
       }catch(e){}
@@ -1587,7 +1587,7 @@ async function boot(){
       const r=await fetch(CFG.gas+'?key='+encodeURIComponent(CFG.key)+'&ts='+Date.now());
       const j=await r.json();
       if(!j.ok) throw new Error(j.error||'読み込み失敗');
-      pre=j.data;
+      pre=j.data; window.__nosData=pre;
       const at=new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
       try{localStorage.setItem('nosCache',JSON.stringify({at,data:pre}));}
       catch(e){ /* 容量オーバー時は明細を除いて保存 */
@@ -2872,6 +2872,13 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
 #qSheet .qkinds label{flex:1;text-align:center;padding:10px 0;border:1px solid var(--line);border-radius:10px;font-size:13px;cursor:pointer;}
 #qSheet .qkinds input{display:none;}
 #qSheet .qkinds label:has(input:checked){background:var(--header);color:#fff;border-color:var(--header);}
+#qSheet .qpresets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+#qSheet .qpresets button{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:999px;padding:7px 12px;font-size:13px;font-family:inherit;cursor:pointer;}
+#qSheet .qpresets button.on{background:var(--green);border-color:var(--green);color:#fff;}
+#qSheet .qpre-label{font-size:12px;color:var(--dim);margin-bottom:6px;}
+#qSheet .qpre-add{margin-bottom:10px;font-size:13px;}
+#qSheet .qpre-add summary{cursor:pointer;color:var(--header);font-weight:700;margin-bottom:8px;}
+#qSheet .qpre-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
 #qPreview{max-width:100%;max-height:180px;border-radius:10px;display:none;margin-bottom:10px;}
 </style>
 <button id="qFab" aria-label="記録する">＋</button>
@@ -2879,6 +2886,7 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
   <div class="qbox">
     <div class="qtabs">
       <button data-q="photo" class="on">📷 写真</button>
+      <button data-q="meal">🍚 食事</button>
       <button data-q="weight">⚖️ 体重</button>
       <button data-q="memo">📝 メモ</button>
     </div>
@@ -2889,9 +2897,20 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
         <label><input type="radio" name="qkind" value="asset">📈 資産</label>
         <label><input type="radio" name="qkind" value="other">📎 その他</label>
       </div>
-      <input type="file" id="qFile" accept="image/*">
+      <input type="file" id="qFile" accept="image/*" multiple>
       <img id="qPreview" alt="">
       <input type="text" id="qNote" placeholder="ひとこと（任意）例: 大盛り、半分残した">
+    </div>
+    <div data-qp="meal" hidden>
+      <select id="qMealType"><option>朝食</option><option>昼食</option><option>夕食</option><option>間食</option></select>
+      <div class="qpre-label">いつもの（タップで追加・もう一度で外す）</div>
+      <div id="qPresets" class="qpresets"></div>
+      <textarea id="qMealText" rows="2" placeholder="ほかに食べたもの（例：おにぎり2個、唐揚げ3個）"></textarea>
+      <details class="qpre-add"><summary>＋「いつもの」を登録する</summary>
+        <input id="qpName" placeholder="名前（例：プロテイン）">
+        <div class="qpre-row"><input id="qpK" type="number" inputmode="decimal" placeholder="kcal"><input id="qpP" type="number" inputmode="decimal" placeholder="P(g)"><input id="qpF" type="number" inputmode="decimal" placeholder="F(g)"><input id="qpC" type="number" inputmode="decimal" placeholder="C(g)"></div>
+        <button type="button" class="qsend" id="qpSave" style="background:var(--green)">登録する</button>
+      </details>
     </div>
     <div data-qp="weight" hidden>
       <input type="number" id="qKg" inputmode="decimal" step="0.1" placeholder="体重 kg（例: 102.3）">
@@ -2907,10 +2926,25 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
 <script>
 (function(){
   const $q=id=>document.getElementById(id);
-  let mode='photo', photo=null;
+  let mode='photo', photos=[], picked={};
+  const post=async body=>{
+    /* text/plain で送る（Apps Scriptはプリフライト非対応のため） */
+    const r=await fetch(CFG.gas,{method:'POST',body:JSON.stringify(Object.assign({key:CFG.key},body))});
+    const j=await r.json(); if(!j.ok) throw new Error(j.error||'失敗しました'); return j;
+  };
+  const autoType=()=>{const h=new Date().getHours();return h<10?'朝食':h<15?'昼食':h<21?'夕食':'間食';};
+  const presets=()=>{
+    const rows=(window.__nosData&&window.__nosData.presets)||[];
+    return rows.slice(1).filter(r=>r[0]).map(r=>({name:r[0],kcal:r[1],p:r[2],f:r[3],c:r[4]}));
+  };
+  const drawPresets=()=>{
+    const ps=presets();
+    $q('qPresets').innerHTML=ps.length?ps.map(x=>'<button type="button" data-n="'+x.name.replace(/"/g,'&quot;')+'" class="'+(picked[x.name]?'on':'')+'">'+x.name.replace(/</g,'&lt;')+' <small>'+x.kcal+'kcal</small></button>').join(''):'<span style="font-size:12px;color:var(--dim)">まだありません。下の「＋いつものを登録する」から追加できます</span>';
+  };
+  $q('qPresets').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const n=b.dataset.n;if(picked[n])delete picked[n];else picked[n]=1;drawPresets();});
   const open=()=>{
     if(typeof CFG==='undefined'||!CFG||!CFG.gas){alert('先に ⚙設定 で受付窓口URLと合言葉を入れてください');return;}
-    $q('qMsg').textContent='';$q('qSheet').classList.remove('hidden');
+    $q('qMsg').textContent='';$q('qMealType').value=autoType();drawPresets();$q('qSheet').classList.remove('hidden');
   };
   const close=()=>$q('qSheet').classList.add('hidden');
   $q('qFab').addEventListener('click',open);
@@ -2920,48 +2954,63 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
     document.querySelectorAll('#qSheet .qtabs button').forEach(x=>x.classList.toggle('on',x===b));
     document.querySelectorAll('#qSheet [data-qp]').forEach(p=>p.hidden=p.dataset.qp!==mode);
   }));
-  /* 写真は送る前に長辺1280pxのJPEGに縮める（通信も読み取り費用も小さくなる） */
-  $q('qFile').addEventListener('change',e=>{
-    const f=e.target.files[0]; if(!f) return;
+  /* 写真は送る前に長辺1280pxのJPEGに縮める（通信量を小さく）。複数枚まとめて選べる */
+  const shrink=f=>new Promise(res=>{
     const img=new Image();
     img.onload=()=>{
       const s=Math.min(1,1280/Math.max(img.width,img.height));
       const c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
       c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-      const url=c.toDataURL('image/jpeg',0.82);
-      photo=url.split(',')[1];
-      $q('qPreview').src=url; $q('qPreview').style.display='block';
-      URL.revokeObjectURL(img.src);
+      URL.revokeObjectURL(img.src); res(c.toDataURL('image/jpeg',0.82));
     };
+    img.onerror=()=>res(null);
     img.src=URL.createObjectURL(f);
   });
-  $q('qSend').addEventListener('click',async()=>{
-    const body={key:CFG.key,type:mode};
-    if(mode==='photo'){
-      if(!photo){$q('qMsg').textContent='写真を選んでください';return;}
-      body.data=photo; body.mime='image/jpeg';
-      body.kind=document.querySelector('input[name=qkind]:checked').value;
-      body.note=$q('qNote').value.trim();
-    }else if(mode==='weight'){
-      body.kg=$q('qKg').value; body.fat=$q('qFat').value; body.source='手入力';
-      if(!body.kg){$q('qMsg').textContent='体重を入れてください';return;}
-    }else{
-      body.text=$q('qText').value.trim();
-      if(!body.text){$q('qMsg').textContent='メモを入れてください';return;}
-    }
-    $q('qSend').disabled=true;
-    $q('qMsg').textContent='送信中…';
+  $q('qFile').addEventListener('change',async e=>{
+    const fs=[...e.target.files]; if(!fs.length) return;
+    const urls=(await Promise.all(fs.map(shrink))).filter(Boolean);
+    photos=urls.map(u=>u.split(',')[1]);
+    $q('qPreview').src=urls[0]; $q('qPreview').style.display='block';
+    $q('qMsg').textContent=photos.length>1?photos.length+'枚を選びました':'';
+  });
+  $q('qpSave').addEventListener('click',async()=>{
+    const name=$q('qpName').value.trim(), kcal=$q('qpK').value;
+    if(!name||!kcal){$q('qMsg').textContent='名前とkcalを入れてください';return;}
     try{
-      /* text/plain で送る（Apps Scriptはプリフライト非対応のため） */
-      const r=await fetch(CFG.gas,{method:'POST',body:JSON.stringify(body)});
-      const j=await r.json();
-      if(!j.ok) throw new Error(j.error||'失敗しました');
-      $q('qMsg').textContent='✅ '+(j.message||'記録しました');
-      photo=null;$q('qFile').value='';$q('qPreview').style.display='none';
-      ['qNote','qKg','qFat','qText'].forEach(id=>$q(id).value='');
+      const j=await post({type:'preset',name,kcal,p:$q('qpP').value,f:$q('qpF').value,c:$q('qpC').value});
+      const d=window.__nosData=window.__nosData||{}; d.presets=(d.presets&&d.presets.length?d.presets:[['名前','kcal','P','F','C']]).filter(r=>r[0]!==name).concat([[name,kcal,$q('qpP').value,$q('qpF').value,$q('qpC').value]]);
+      ['qpName','qpK','qpP','qpF','qpC'].forEach(id=>$q(id).value='');
+      picked[name]=1; drawPresets(); $q('qMsg').textContent='✅ '+j.message;
+    }catch(e){$q('qMsg').textContent='⚠️ '+(e.message||e);}
+  });
+  $q('qSend').addEventListener('click',async()=>{
+    const jobs=[];
+    if(mode==='photo'){
+      if(!photos.length){$q('qMsg').textContent='写真を選んでください';return;}
+      const kind=document.querySelector('input[name=qkind]:checked').value, note=$q('qNote').value.trim();
+      photos.forEach(data=>jobs.push({type:'photo',data,mime:'image/jpeg',kind,note}));
+    }else if(mode==='meal'){
+      const t=$q('qMealType').value, ps=presets().filter(x=>picked[x.name]), txt=$q('qMealText').value.trim();
+      if(!ps.length&&!txt){$q('qMsg').textContent='いつものを選ぶか、食べたものを書いてください';return;}
+      ps.forEach(x=>jobs.push({type:'meal',meal_type:t,items:x.name,kcal:x.kcal,p:x.p,f:x.f,c:x.c}));
+      if(txt) jobs.push({type:'meal',meal_type:t,items:txt});
+    }else if(mode==='weight'){
+      if(!$q('qKg').value){$q('qMsg').textContent='体重を入れてください';return;}
+      jobs.push({type:'weight',kg:$q('qKg').value,fat:$q('qFat').value,source:'手入力'});
+    }else{
+      if(!$q('qText').value.trim()){$q('qMsg').textContent='メモを入れてください';return;}
+      jobs.push({type:'memo',text:$q('qText').value.trim()});
+    }
+    $q('qSend').disabled=true; $q('qMsg').textContent='送信中…';
+    const done=[];
+    try{
+      for(const b of jobs){ const j=await post(b); done.push(j.message||'記録しました'); }
+      $q('qMsg').textContent='✅ '+(done.length>1?done.length+'件：':'')+done[done.length-1];
+      photos=[]; picked={}; $q('qFile').value=''; $q('qPreview').style.display='none';
+      ['qNote','qKg','qFat','qText','qMealText'].forEach(id=>$q(id).value=''); drawPresets();
       if(typeof boot==='function') setTimeout(boot,500);
     }catch(e){
-      $q('qMsg').textContent='⚠️ '+(e.message||e)+'（通信できない場合は時間をおいてもう一度）';
+      $q('qMsg').textContent='⚠️ '+(done.length?done.length+'件は記録済み。残りで失敗：':'')+(e.message||e)+'（時間をおいてもう一度）';
     }finally{$q('qSend').disabled=false;}
   });
 })();
