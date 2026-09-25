@@ -85,11 +85,26 @@ nav .navitem .ico{font-size:16px;}
 nav .navitem:hover{background:#F0F2FA;color:var(--text);}
 nav .navitem.active{background:#E9ECFB;color:var(--header);}
 main{flex:1;padding:22px;max-width:1200px;}
+nav .tab{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-bottom:4px;border-radius:9px;font-size:14px;font-weight:800;color:var(--dim);cursor:pointer;user-select:none;}
+nav .tab .ico{font-size:18px;}
+nav .tab.on{background:#E9ECFB;color:var(--header);}
+.subtabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;-webkit-overflow-scrolling:touch;}
+.subtabs[hidden]{display:none;}
+.subtabs button{flex:0 0 auto;border:1.5px solid var(--line);background:var(--card);color:var(--dim);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;}
+.subtabs button.on{background:var(--header);border-color:var(--header);color:#fff;}
 @media(max-width:760px){
   .layout{flex-direction:column;}
-  nav{width:100%;display:flex;overflow-x:auto;padding:8px;border-right:none;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch;}
-  nav .navitem{white-space:nowrap;margin-bottom:0;margin-right:4px;padding:9px 12px;}
-  main{padding:14px;}
+  /* スマホ: アプリのような下タブ */
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:800;width:100%;padding:4px 4px calc(4px + env(safe-area-inset-bottom));border-right:none;border-top:1px solid var(--line);box-shadow:0 -2px 10px rgba(60,70,120,.08);}
+  nav .tabs{display:flex;}
+  nav .tab{flex:1;flex-direction:column;gap:1px;margin:0;padding:6px 0;font-size:11px;border-radius:10px;}
+  nav .tab .ico{font-size:21px;}
+  nav .tab.on{background:none;}
+  main{padding:14px 14px calc(90px + env(safe-area-inset-bottom));}
+  .topbar h1 small{display:none;}
+  .topbar h1,.topbar button{white-space:nowrap;}
+  .topbar button{padding:7px 10px;}
+  #qFab{bottom:calc(84px + env(safe-area-inset-bottom)) !important;}
   /* 金額が箱からはみ出ないよう画面幅に応じて縮小 */
   .fbox .val{font-size:clamp(15px,5.4vw,22px);}
   .fop{font-size:20px;}
@@ -308,6 +323,14 @@ canvas{max-width:100%;}
 <!-- app -->
 <div class="layout hidden" id="app">
   <nav>
+    <div class="tabs" id="mainTabs">
+      <div class="tab on" data-g="today"><span class="ico">🏠</span>今日</div>
+      <div class="tab" data-g="body"><span class="ico">🏃</span>からだ</div>
+      <div class="tab" data-g="money"><span class="ico">💰</span>お金</div>
+      <div class="tab" data-g="study"><span class="ico">📚</span>勉強</div>
+      <div class="tab" data-g="memo"><span class="ico">📝</span>メモ</div>
+    </div>
+    <div class="oldnav" hidden>
     <div class="navitem active" data-page="p-today"><span class="ico">🏠</span>今日</div>
     <div class="navitem" data-page="p-summary"><span class="ico">📊</span>資産サマリー</div>
     <div class="navitem" data-page="p-cf"><span class="ico">💰</span>収支推移</div>
@@ -320,9 +343,11 @@ canvas{max-width:100%;}
     <div class="navitem" data-page="p-study"><span class="ico">📚</span>勉強</div>
     <div class="navitem" data-page="p-radar"><span class="ico">📡</span>レーダー</div>
     <div class="navitem" data-page="p-manual"><span class="ico">📖</span>使い方</div>
+    </div>
   </nav>
 
   <main>
+    <div class="subtabs" id="subTabs" hidden></div>
     <div id="errbox"></div>
     <div id="alertbox"></div>
 
@@ -359,6 +384,18 @@ canvas{max-width:100%;}
         </div>
       </div>
 
+      <div class="card" onclick="__today.go('p-study')" style="cursor:pointer;background:linear-gradient(135deg,#FFF7E6,#FFFFFF);border:1.5px solid #F5D08A">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:34px">📚</div>
+          <div style="flex:1">
+            <div style="font-size:12px;color:var(--dim);font-weight:700">宅建 2027 本番まで</div>
+            <div style="font-size:24px;font-weight:900;color:#C77A00" id="takkenDays">—</div>
+            <div style="font-size:13px;font-weight:700;margin-top:2px">今日の勉強：<span id="todayStudy">—</span></div>
+          </div>
+          <div style="font-weight:800;color:var(--header);font-size:14px">勉強する ›</div>
+        </div>
+      </div>
+
       <div class="card">
         <h2>📌 今日やること <span class="tag" id="todayCount">—</span></h2>
         <div id="todayTasks"></div>
@@ -374,10 +411,6 @@ canvas{max-width:100%;}
       </div>
 
       <div class="grid2">
-        <div class="card today-mini" onclick="__today.go('p-study')">
-          <div class="tm-ico">📚</div><div class="tm-label">勉強</div>
-          <div class="tm-val" id="todayStudy">—</div>
-        </div>
         <div class="card today-mini" onclick="__today.go('p-health')">
           <div class="tm-ico">🏃</div><div class="tm-label">健康</div>
           <div class="tm-val" id="todayKcal" style="font-size:13px;color:var(--dim)">記録する →</div>
@@ -1141,6 +1174,33 @@ document.querySelectorAll('.navitem').forEach(el=>{
     document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
     $(el.dataset.page).classList.remove('hidden');
   });
+});
+
+/* ---- 5つのメインタブ（中身は既存ページをグループ化） ---- */
+const TABG={
+  today:[['p-today','今日']],
+  body:[['p-health','体重・食事']],
+  money:[['p-summary','📊 資産'],['p-cf','💰 収支'],['p-detail','🧾 費目別'],['p-yutai','🎁 優待・配当'],['p-report','📝 月次レポート'],['p-shop','🛒 買うもの']],
+  study:[['p-study','宅建']],
+  memo:[['p-memo','📝 メモ帳'],['p-radar','📡 レーダー'],['p-manual','📖 使い方']]
+};
+const lastInG={};
+function syncTabs(page){
+  const g=Object.keys(TABG).find(k=>TABG[k].some(x=>x[0]===page))||'today';
+  lastInG[g]=page;
+  document.querySelectorAll('#mainTabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.g===g));
+  const st=$('subTabs'), items=TABG[g];
+  st.hidden=items.length<2;
+  st.innerHTML=items.map(x=>'<button data-p="'+x[0]+'" class="'+(x[0]===page?'on':'')+'">'+x[1]+'</button>').join('');
+}
+document.querySelectorAll('.navitem').forEach(el=>el.addEventListener('click',()=>{syncTabs(el.dataset.page);window.scrollTo(0,0);}));
+document.querySelectorAll('#mainTabs .tab').forEach(t=>t.addEventListener('click',()=>{
+  const g=t.dataset.g, pg=lastInG[g]||TABG[g][0][0];
+  const n=document.querySelector('.navitem[data-page="'+pg+'"]'); if(n) n.click();
+}));
+$('subTabs').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  const n=document.querySelector('.navitem[data-page="'+b.dataset.p+'"]'); if(n) n.click();
 });
 
 /* ---- setup flow ---- */
@@ -2762,6 +2822,8 @@ window.__yotei = fetch('./yotei.json?ts='+Date.now())
     g('todayTasks').innerHTML=items.length?items.map(taskHTML).join(''):'<div class="tk-empty">今日やることは無し。ゆっくりいこう☕️</div>';
     g('todayCount').textContent=items.length?items.length+'件':'なし';
     const si=studyInfo();
+    /* 宅建試験は毎年10月第3日曜。2027年は10/17（予定） */
+    { const ex=new Date('2027-10-17T00:00:00+09:00'); const d=Math.ceil((ex-new Date())/86400000); g('takkenDays').textContent=d>0?'あと '+d+' 日':'本番！'; }
     g('todayStudy').innerHTML=si.done>=si.goal&&si.started?`✅ ${si.done}/${si.goal}問`:`${si.done}/${si.goal}問${si.streak?` 🔥${si.streak}`:''}`;
     const p=penguin(items,si);
     if(p.img)g('todayPeng').src=p.img;
