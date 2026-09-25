@@ -33,7 +33,8 @@ const SHEETS = {
   weight: '体重ログ',
   kabuhist: '株価履歴',
   inbox: '受信箱',
-  presets: 'いつもの'
+  presets: 'いつもの',
+  trades: '取引履歴'
 };
 
 /* 無ければ自動で作るシートと見出し行 */
@@ -74,6 +75,9 @@ function doPost(e) {
       case 'memo': return json_(addInbox_('メモ', body.text || '', ''));
       case 'meal': return json_(addMeal_(body));
       case 'preset': return json_(addPreset_(body));
+      case 'trade': return json_(addInbox_('売買', body.text || '', '', '未読取'));
+      case 'sheetOps': return json_(sheetOps_(body));
+      case 'radar': return json_(addInbox_('レーダー', (body.title ? '【' + body.title + '】' : '') + (body.text || ''), '', '処理済'));
       case 'photo': return json_(addPhoto_(body));
       case 'photoDone': return json_(photoDone_(body));
       default: return json_({ ok: false, error: '不明な種類: ' + body.type });
@@ -139,9 +143,10 @@ function addPreset_(b) {
 
 /* ================= メモ・受信箱 ================= */
 
-function addInbox_(kind, text, photoUrl) {
+function addInbox_(kind, text, photoUrl, status) {
   if (!text && !photoUrl) return { ok: false, error: '中身が空です' };
-  sheet_('受信箱').appendRow([now_(), kind, text, photoUrl, '未処理']);
+  sheet_('受信箱').appendRow([now_(), kind, text, photoUrl, status || '未処理']);
+  if (status === '未読取') return { ok: true, message: '記録しました。次の自動読み取り（朝・昼・夜）で反映されます' };
   return { ok: true, message: '受信箱に入れました' };
 }
 
@@ -311,6 +316,10 @@ function pendingPhotos_(limit) {
   const items = [];
   for (let i = 1; i < rows.length && items.length < limit; i++) {
     if (rows[i][4] !== '未読取') continue;
+    if (rows[i][1] === '売買') {
+      items.push({ row: i + 1, kind: 'trade', note: rows[i][2], received: rows[i][0] });
+      continue;
+    }
     if (rows[i][1] === '食事(テキスト)') {
       items.push({ row: i + 1, kind: 'mealText', note: rows[i][2], received: rows[i][0] });
       continue;
@@ -325,7 +334,12 @@ function pendingPhotos_(limit) {
   }
   let left = 0;
   for (let i = 1; i < rows.length; i++) if (rows[i][4] === '未読取') left++;
-  return { ok: true, items: items, left: left, snapHeader: headerOf_('snap') };
+  const out = { ok: true, items: items, left: left, snapHeader: headerOf_('snap') };
+  if (items.some(function (x) { return x.kind === 'trade' || x.kind === 'asset'; })) {
+    out.port = sheetValues_('port');      // 保有銘柄（見出し行つき）
+    out.tradesHeader = headerOf_('trades');
+  }
+  return out;
 }
 
 /* 読み取り結果の書き戻し。{row, meal:{...}} / {row, weight:{kg,fat,bmi}} / {row, snapRow:[...]} / {row, text:'...'} */
@@ -356,6 +370,45 @@ function photoDone_(b) {
   sh.getRange(row, 5).setValue('処理済');
   if (b.text) sh.getRange(row, 3).setValue((sh.getRange(row, 3).getValue() ? sh.getRange(row, 3).getValue() + ' / ' : '') + b.text);
   return { ok: true, message: msg || '受信箱にメモしました' };
+}
+
+function sheetValues_(key) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS[key]);
+  return sh ? sh.getDataRange().getDisplayValues() : null;
+}
+
+/* 定期実行（売買・配当レーダー）からのスプシ更新。書けるのはポートフォリオ・取引履歴・資産スナップショットだけ。
+   {row?, ops:[{op:'append', sheet:'trades'|'port'|'snap', values:[...]},
+               {op:'set', sheet:'port', matchCol:0, matchValue:'7203', set:{"3":"200","4":"2500"}}], text?}
+   行の削除はしない（売り切ったら株数を0にする） */
+function sheetOps_(b) {
+  const allowed = { trades: 1, port: 1, snap: 1 };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const done = [];
+  (b.ops || []).forEach(function (o) {
+    if (!allowed[o.sheet]) throw new Error('書き込めないシート: ' + o.sheet);
+    const sh = ss.getSheetByName(SHEETS[o.sheet]);
+    if (!sh) throw new Error(SHEETS[o.sheet] + ' シートがありません');
+    if (o.op === 'append') {
+      sh.appendRow(o.values);
+      done.push(SHEETS[o.sheet] + 'に1行追加');
+    } else if (o.op === 'set') {
+      const v = sh.getDataRange().getDisplayValues();
+      let r = -1;
+      for (let i = 1; i < v.length; i++) if (String(v[i][o.matchCol]).trim() === String(o.matchValue).trim()) { r = i; break; }
+      if (r < 0) throw new Error(SHEETS[o.sheet] + 'に ' + o.matchValue + ' が見つかりません');
+      Object.keys(o.set || {}).forEach(function (c) { sh.getRange(r + 1, parseInt(c, 10) + 1).setValue(o.set[c]); });
+      done.push(SHEETS[o.sheet] + ' ' + o.matchValue + ' を更新');
+    } else {
+      throw new Error('不明な操作: ' + o.op);
+    }
+  });
+  if (b.row) {
+    const ib = sheet_('受信箱');
+    ib.getRange(parseInt(b.row, 10), 5).setValue('処理済');
+    if (b.text) ib.getRange(parseInt(b.row, 10), 3).setValue(ib.getRange(parseInt(b.row, 10), 3).getValue() + ' / ' + b.text);
+  }
+  return { ok: true, message: done.join('、') || '更新なし' };
 }
 
 function headerOf_(key) {
