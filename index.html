@@ -1593,8 +1593,11 @@ async function boot(){
         $('stamp').textContent='前回 '+(cached.at||'')+' ・更新中…';
       }catch(e){}
     }
+    if(!boot._drawn){ $('app').classList.remove('hidden'); $('stamp').textContent='読み込み中…'; }
     try{
-      const r=await fetch(CFG.gas+'?key='+encodeURIComponent(CFG.key)+'&ts='+Date.now());
+      const ctl=new AbortController(); const tm=setTimeout(()=>ctl.abort(),25000);
+      const r=await fetch(CFG.gas+'?key='+encodeURIComponent(CFG.key)+'&ts='+Date.now(),{signal:ctl.signal});
+      clearTimeout(tm);
       const j=await r.json();
       if(!j.ok) throw new Error(j.error||'読み込み失敗');
       pre=j.data; window.__nosData=pre; if(window.__radarRender) try{window.__radarRender();}catch(e){}
@@ -1603,7 +1606,7 @@ async function boot(){
       catch(e){ /* 容量オーバー時は明細を除いて保存 */
         try{const lite={...pre,meisai:null};localStorage.setItem('nosCache',JSON.stringify({at,data:lite}));}catch(e2){}
       }
-    }catch(e){errs.push('受付窓口: '+(e.message||e));}
+    }catch(e){errs.push('受付窓口: '+(e.name==='AbortError'?'応答がありません（25秒）。URLが古い可能性があります':(e.message||e)));}
   }
   const [snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish,meal,weight]=CFG.gas ? KEYS.map(k=>pre&&pre[k]||null) : await Promise.all([
     get(CFG.snap,'資産スナップショット'),get(CFG.cf,'月次収支'),get(CFG.port,'ポートフォリオ'),get(CFG.loan,'負債'),get(CFG.meisai,'購入明細'),get(CFG.report,'レポート'),get(CFG.hist,'配当履歴'),get(CFG.fixed,'固定費'),get(CFG.income,'収入明細'),get(CFG.watch,'ウォッチリスト'),get(CFG.wish,'欲しいものリスト'),getQuiet(CFG.meal),getQuiet(CFG.weight)
