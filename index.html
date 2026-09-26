@@ -104,7 +104,9 @@ nav .tab.on{background:#E9ECFB;color:var(--header);}
   .topbar h1 small{display:none;}
   .topbar h1,.topbar button{white-space:nowrap;}
   .topbar button{padding:7px 10px;}
-  #qFab{bottom:calc(84px + env(safe-area-inset-bottom)) !important;}
+  #qFab{bottom:calc(84px + env(safe-area-inset-bottom)) !important;width:52px !important;height:52px !important;line-height:52px !important;font-size:28px !important;right:12px !important;}
+  #p-today .card{scroll-margin-bottom:80px;}
+  #tqMemoBtn{margin-right:56px;}
   /* 金額が箱からはみ出ないよう画面幅に応じて縮小 */
   .fbox .val{font-size:clamp(15px,5.4vw,22px);}
   .fop{font-size:20px;}
@@ -393,6 +395,18 @@ canvas{max-width:100%;}
             <div style="font-size:13px;font-weight:700;margin-top:2px">今日の勉強：<span id="todayStudy">—</span></div>
           </div>
           <div style="font-weight:800;color:var(--header);font-size:14px">勉強する ›</div>
+        </div>
+      </div>
+
+      <div class="card" id="todayMoney" style="cursor:pointer" onclick="__today.go('p-summary')">
+        <h2>💰 お金 <span class="tag" id="tmAsOf">—</span></h2>
+        <div class="grid2" style="gap:10px;margin-bottom:10px">
+          <div><div class="tm-label">純資産</div><div style="font-size:20px;font-weight:900" id="tmNet">—</div></div>
+          <div><div class="tm-label">株の評価額</div><div style="font-size:20px;font-weight:900" id="tmStock">—</div><div style="font-size:12px;font-weight:700" id="tmPl"></div></div>
+        </div>
+        <div onclick="event.stopPropagation();__today.go('p-yutai')" style="border-top:1px solid var(--line);padding-top:10px">
+          <div class="tm-label" id="tmMonthLb">今月の優待・配当</div>
+          <div id="tmMonth" style="font-size:13px;line-height:1.8;margin-top:4px">—</div>
         </div>
       </div>
 
@@ -1616,12 +1630,37 @@ async function boot(){
   if(!snap||!cf||!port){$('app').classList.remove('hidden');if(boot._drawn&&errs.length)$('stamp').textContent='前回のデータを表示中';return;}
   try{
     render({snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish,meal,weight});
+    try{ todayMoney(); }catch(e){}
     $('stamp').textContent='更新: '+new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   }catch(e){
     $('errbox').innerHTML='<div class="err">描画エラー: '+(e.message||e)+'<br>この画面のスクショをClaudeに送ってください。<br><span style="font-size:10px;">'+(e.stack||'').split('\n').slice(0,3).join('<br>')+'</span></div>';
   }
   $('app').classList.remove('hidden');
   requestAnimationFrame(fitNums);
+}
+/* 🏠今日の「お金」カード：純資産・株の評価額と含み損益・今月の優待と配当 */
+function todayMoney(){
+  if(!$('todayMoney')) return;
+  $('tmNet').textContent = ($('f-net')&&$('f-net').textContent) || '—';
+  $('tmAsOf').textContent = ($('snap-date')&&$('snap-date').textContent) || '';
+  const hs = window.__holdings||[];
+  const val = hs.reduce((a,h)=>a+(h.value||0),0);
+  const cost = hs.reduce((a,h)=>a+((h.acqPrice||0)*(h.shares||0)),0);
+  $('tmStock').textContent = hs.length ? yen(val) : '—';
+  if(hs.length && cost){ const pl=val-cost; $('tmPl').innerHTML='<span style="color:'+(pl>=0?'var(--green)':'var(--red)')+'">含み損益 '+signed(pl)+'</span>'; }
+  const m = new Date().getMonth();
+  $('tmMonthLb').textContent = (m+1)+'月の優待・配当 ›';
+  let html = '—';
+  try{
+    const c = window.__buildCal ? window.__buildCal(false)[m] : null;
+    if(c){
+      const ys = c.yutai.map(x=>x.h.name+(x.h.yutai?'（'+x.h.yutai+'）':''));
+      const divSum = c.div.reduce((a,x)=>a+(x.amt||0),0);
+      html = '🎁 権利確定：'+(ys.length?ys.slice(0,6).join('、')+(ys.length>6?' ほか'+(ys.length-6)+'銘柄':''):'なし')
+        + '<br>💴 配当入金の目安：'+(divSum?yen(divSum)+'（'+c.div.length+'銘柄）':'なし');
+    }
+  }catch(e){}
+  $('tmMonth').innerHTML = html;
 }
 /* 金額が箱からはみ出す場合、収まるまでフォントを縮める（機種を問わず絶対に切れない保険） */
 function fitNums(){
@@ -1672,7 +1711,7 @@ function render(d){
     $('f-net-sub').innerHTML = prev? '前月比 '+signed(latest.net-prev.net) : '初回記録';
     $('f-debt-sub').textContent='レイク等（住宅ローンは別枠）';
     if(latest.dt.y!==now.getFullYear()||latest.dt.m!==now.getMonth()+1)
-      alerts.push('<b>今月の棚卸しがまだです</b>：スクショを撮ってClaudeに「取り込んで」');
+      alerts.push('<b>今月の棚卸しがまだです</b>：証券・銀行アプリのスクショを ＋ → 📷写真 → 📈資産 で送るだけ');
   }else alerts.push('<b>資産スナップショットにデータがありません</b>');
 
   /* net chart */
