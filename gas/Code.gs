@@ -402,16 +402,7 @@ function sheetOps_(b) {
       sh.appendRow(o.values);
       done.push(SHEETS[o.sheet] + 'に1行追加');
     } else if (o.op === 'clearDup' && o.sheet === 'port') {
-      /* 完全に同じ内容の重複行だけを空にする（最初の1行は残す）。中身の違う行は消さない */
-      const v = sh.getDataRange().getDisplayValues();
-      const seen = {};
-      let n = 0;
-      for (let i = 1; i < v.length; i++) {
-        const k = v[i].join('\u0001');
-        if (!v[i][0] && !v[i][1]) continue;
-        if (seen[k]) { sh.getRange(i + 1, 1, 1, v[i].length).clearContent(); n++; } else seen[k] = true;
-      }
-      done.push('ポートフォリオの重複' + n + '行を空にした');
+      done.push('ポートフォリオの重複' + clearDupPort_() + '行を空にした');
     } else if (o.op === 'set') {
       const v = sh.getDataRange().getDisplayValues();
       let r = -1;
@@ -520,9 +511,25 @@ function setupTriggers() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'dailyPrices') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('dailyPrices').timeBased().everyDays(1).atHour(16).inTimezone(TZ).create();
   const r = updatePrices_();
+  const dup = clearDupPort_();
+  console.log('重複行の整理: ' + dup + '行');
   console.log('トリガー作成OK。今回の株価更新: ' + r.updated + '銘柄' + (r.failed && r.failed.length ? '／取得できず: ' + r.failed.join(', ') : ''));
 }
-function dailyPrices() { updatePrices_(); }
+function dailyPrices() { updatePrices_(); clearDupPort_(); }
+
+/* ポートフォリオの完全に同じ重複行だけを空にする（最初の1行は残す）。中身の違う行は消さない */
+function clearDupPort_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.port);
+  const v = sh.getDataRange().getDisplayValues();
+  const seen = {};
+  let n = 0;
+  for (let i = 1; i < v.length; i++) {
+    if (!v[i][0] && !v[i][1]) continue;
+    const k = v[i].join('\u0001');
+    if (seen[k]) { sh.getRange(i + 1, 1, 1, v[i].length).clearContent(); n++; } else seen[k] = true;
+  }
+  return n;
+}
 
 function headerOf_(key) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS[key]);
