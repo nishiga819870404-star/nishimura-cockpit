@@ -62,6 +62,7 @@ function doGet(e) {
     const sh = ss.getSheetByName(SHEETS[k]);
     data[k] = sh ? sh.getDataRange().getDisplayValues() : null;
   });
+  data.meta = meta_();
   return json_({ ok: true, updated: now_(), data: data });
 }
 
@@ -80,6 +81,8 @@ function doPost(e) {
       case 'radar': return json_(addInbox_('レーダー', (body.title ? '【' + body.title + '】' : '') + (body.text || ''), '', '処理済'));
       case 'photo': return json_(addPhoto_(body));
       case 'photoDone': return json_(photoDone_(body));
+      case 'prices': return json_(updatePrices_());
+      case 'stamp': return json_(stampMeta_(body));
       default: return json_({ ok: false, error: '不明な種類: ' + body.type });
     }
   } catch (err) {
@@ -390,8 +393,25 @@ function sheetOps_(b) {
     const sh = ss.getSheetByName(SHEETS[o.sheet]);
     if (!sh) throw new Error(SHEETS[o.sheet] + ' シートがありません');
     if (o.op === 'append') {
+      if (o.sheet === 'port') {
+        const v0 = sh.getDataRange().getDisplayValues();
+        const key = function (r) { return [r[0], r[1], r[3], r[14]].map(function (x) { return String(x == null ? '' : x).trim(); }).join('|'); };
+        const k = key(o.values);
+        if (v0.some(function (r) { return key(r) === k; })) { done.push(SHEETS[o.sheet] + 'は同じ行があるので追加せず'); return; }
+      }
       sh.appendRow(o.values);
       done.push(SHEETS[o.sheet] + 'に1行追加');
+    } else if (o.op === 'clearDup' && o.sheet === 'port') {
+      /* 完全に同じ内容の重複行だけを空にする（最初の1行は残す）。中身の違う行は消さない */
+      const v = sh.getDataRange().getDisplayValues();
+      const seen = {};
+      let n = 0;
+      for (let i = 1; i < v.length; i++) {
+        const k = v[i].join('\u0001');
+        if (!v[i][0] && !v[i][1]) continue;
+        if (seen[k]) { sh.getRange(i + 1, 1, 1, v[i].length).clearContent(); n++; } else seen[k] = true;
+      }
+      done.push('ポートフォリオの重複' + n + '行を空にした');
     } else if (o.op === 'set') {
       const v = sh.getDataRange().getDisplayValues();
       let r = -1;
@@ -410,6 +430,99 @@ function sheetOps_(b) {
   }
   return { ok: true, message: done.join('、') || '更新なし' };
 }
+
+/* ================= 株価の自動更新・更新日の記録 ================= */
+
+/* ポートフォリオの全銘柄の株価を GOOGLEFINANCE で取り直し、現在株価・評価額を更新して株価履歴に1日1回記録する。
+   毎日16時のトリガー（setupTriggers で作る）と、定期実行からの {type:'prices'} で動く */
+function updatePrices_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(SHEETS.port);
+  const v = sh.getDataRange().getDisplayValues();
+  const f = sh.getDataRange().getFormulas();
+  const hd = v[0];
+  const col = function (name) { return hd.indexOf(name); };
+  const cCode = col('コード') < 0 ? 0 : col('コード'), cName = col('銘柄名') < 0 ? 1 : col('銘柄名');
+  const cSh = col('株数'), cAcq = col('取得単価'), cCur = col('現在株価'), cVal = col('評価額');
+  if (cCur < 0) throw new Error('ポートフォリオに「現在株価」列がありません');
+  const rows = [];
+  for (let i = 1; i < v.length; i++) {
+    const code = String(v[i][cCode] || '').trim();
+    if (/^[0-9][0-9A-Z]{3}$/.test(code)) rows.push(i);
+  }
+  let tmp = ss.getSheetByName('株価取得');
+  if (!tmp) { tmp = ss.insertSheet('株価取得'); tmp.hideSheet(); }
+  tmp.clear();
+  if (!rows.length) return { ok: true, updated: 0 };
+  tmp.getRange(1, 1, rows.length, 2).setValues(rows.map(function (i) {
+    const code = String(v[i][cCode]).trim();
+    return [code, '=IFERROR(GOOGLEFINANCE("TYO:' + code + '","price"),"")'];
+  }));
+  let got = [];
+  for (let t = 0; t < 4; t++) {
+    SpreadsheetApp.flush();
+    Utilities.sleep(2500 + t * 2500);
+    got = tmp.getRange(1, 2, rows.length, 1).getValues().map(function (r) { return r[0]; });
+    if (!got.some(function (x) { return String(x).indexOf('Loading') >= 0; })) break;
+  }
+  const today = today_();
+  const hist = sheet_(SHEETS.kabuhist);
+  if (hist.getLastRow() === 0) hist.appendRow(['日付', '銘柄コード', '銘柄名', '株価']);
+  const hv = hist.getDataRange().getDisplayValues();
+  const doneToday = {};
+  hv.forEach(function (r) { if (r[0] === today) doneToday[r[1]] = true; });
+  const histRows = [], failed = [], skipped = [];
+  let n = 0;
+  rows.forEach(function (i, k) {
+    const code = String(v[i][cCode]).trim(), name = v[i][cName];
+    const p = Number(got[k]);
+    if (!p || p <= 0) { failed.push(name + '(' + code + ')'); return; }
+    /* 桁ずれ防止：取得単価から10倍以上ずれる値は書かない */
+    const acq = num_(cAcq >= 0 ? v[i][cAcq] : null);
+    if (acq && (p > acq * 10 || p < acq / 10)) { skipped.push(name + ' ' + p); return; }
+    if (!f[i][cCur]) sh.getRange(i + 1, cCur + 1).setValue(p);
+    const shares = num_(cSh >= 0 ? v[i][cSh] : null);
+    if (cVal >= 0 && shares !== null && !f[i][cVal]) sh.getRange(i + 1, cVal + 1).setValue(Math.round(p * shares));
+    if (!doneToday[code]) { histRows.push([today, code, name, p]); doneToday[code] = true; }
+    n++;
+  });
+  if (histRows.length) hist.getRange(hist.getLastRow() + 1, 1, histRows.length, 4).setValues(histRows);
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('PRICES_AT', now_());
+  props.setProperty('PRICES_N', String(n));
+  props.setProperty('PRICES_FAILED', failed.concat(skipped).join(' / ').slice(0, 400));
+  return { ok: true, updated: n, failed: failed, skipped: skipped, at: now_() };
+}
+
+/* 更新日の記録（定期実行から {type:'stamp', name:'yutai'} で「優待・配当を確認した日」を残す） */
+function stampMeta_(b) {
+  const keys = { yutai: 'YUTAI_AT', prices: 'PRICES_AT' };
+  const k = keys[b.name];
+  if (!k) throw new Error('不明な記録: ' + b.name);
+  PropertiesService.getScriptProperties().setProperty(k, now_());
+  if (b.note) PropertiesService.getScriptProperties().setProperty(k + '_NOTE', String(b.note).slice(0, 400));
+  return { ok: true, message: b.name + ' の更新日を記録' };
+}
+
+function meta_() {
+  const p = PropertiesService.getScriptProperties();
+  return {
+    pricesAt: p.getProperty('PRICES_AT') || '',
+    pricesN: p.getProperty('PRICES_N') || '',
+    pricesFailed: p.getProperty('PRICES_FAILED') || '',
+    yutaiAt: p.getProperty('YUTAI_AT') || '',
+    yutaiNote: p.getProperty('YUTAI_AT_NOTE') || ''
+  };
+}
+
+/* 最初に1回だけ手で実行：毎日16時（大引け後）に株価を自動更新するトリガーを作る */
+function setupTriggers() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'dailyPrices') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('dailyPrices').timeBased().everyDays(1).atHour(16).inTimezone(TZ).create();
+  const r = updatePrices_();
+  console.log('トリガー作成OK。今回の株価更新: ' + r.updated + '銘柄' + (r.failed && r.failed.length ? '／取得できず: ' + r.failed.join(', ') : ''));
+}
+function dailyPrices() { updatePrices_(); }
 
 function headerOf_(key) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS[key]);

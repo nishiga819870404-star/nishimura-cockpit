@@ -408,6 +408,7 @@ canvas{max-width:100%;}
           <div class="tm-label" id="tmMonthLb">今月の優待・配当</div>
           <div id="tmMonth" style="font-size:13px;line-height:1.8;margin-top:4px">—</div>
         </div>
+        <div id="tmFresh" style="font-size:11px;margin-top:8px"></div>
       </div>
 
       <div class="card">
@@ -470,6 +471,7 @@ canvas{max-width:100%;}
           <div class="lb">優待株評価額 <span style="font-size:10px;color:#8A93A6;">›内訳</span></div>
           <div class="val" id="k-port">—</div>
           <div class="sub" id="k-port-sub">—</div>
+          <div class="sub" id="k-portFresh" style="font-size:10.5px;"></div>
         </div>
         <div class="kpi clickable" style="--accent:var(--header)" onclick="showAllStocks()" title="クリックで全銘柄一覧（並び替え可）">
           <div class="lb">保有株 全一覧 <span style="font-size:10px;color:#8A93A6;">›一覧</span></div>
@@ -603,6 +605,7 @@ canvas{max-width:100%;}
 
       <div class="card">
         <h2>優待・配当カレンダー <span class="tag">月をクリックで明細</span></h2>
+        <div class="note" id="ycalFresh" style="margin:0 0 6px;"></div>
         <label class="toggle"><input type="checkbox" id="eligOnly"> 権利条件を達成している優待のみ表示</label>
         <div class="ycal" id="ycal"></div>
         <div class="note">🎁＝権利確定する優待銘柄。💰＝配当支払の目安額（権利月＋3ヶ月で概算）。✅＝長期条件クリア／⏳＝あと少し／❓＝取得日不明。</div>
@@ -1638,6 +1641,27 @@ async function boot(){
   $('app').classList.remove('hidden');
   requestAnimationFrame(fitNums);
 }
+/* 株価・優待配当の最終更新日（受付窓口の記録 → 無ければ株価履歴の最終日） */
+function freshInfo(){
+  const d=window.__nosData||{}, m=d.meta||{};
+  let p=m.pricesAt||'';
+  if(!p && d.kabuhist && d.kabuhist.length>1) p=d.kabuhist[d.kabuhist.length-1][0]||'';
+  const fmt=x=>{const t=String(x||'').match(/(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2}))?/);return t?(+t[2])+'/'+(+t[3])+(t[4]?' '+t[4]:''):'';};
+  const days=x=>{const t=String(x||'').slice(0,10);return t?Math.floor((Date.now()-new Date(t+'T00:00:00+09:00'))/864e5):null;};
+  const pd=days(p), yd=days(m.yutaiAt);
+  return {
+    price: p?('株価 '+fmt(p)+' 更新'):'株価 更新記録なし',
+    priceOld: pd===null||pd>3,
+    yutai: m.yutaiAt?('優待・配当 '+fmt(m.yutaiAt)+' 確認'):'優待・配当 確認記録なし',
+    yutaiOld: yd===null||yd>40,
+    failed: m.pricesFailed||''
+  };
+}
+function freshHtml(){
+  const f=freshInfo();
+  const s=(t,old)=>'<span style="color:'+(old?'var(--red)':'#8A93A6')+';font-weight:'+(old?800:400)+'">'+(old?'⚠ ':'')+t+'</span>';
+  return s(f.price,f.priceOld)+' ／ '+s(f.yutai,f.yutaiOld);
+}
 /* 🏠今日の「お金」カード：純資産・株の評価額と含み損益・今月の優待と配当 */
 function todayMoney(){
   if(!$('todayMoney')) return;
@@ -1648,6 +1672,7 @@ function todayMoney(){
   const cost = hs.reduce((a,h)=>a+((h.acqPrice||0)*(h.shares||0)),0);
   $('tmStock').textContent = hs.length ? yen(val) : '—';
   if(hs.length && cost){ const pl=val-cost; $('tmPl').innerHTML='<span style="color:'+(pl>=0?'var(--green)':'var(--red)')+'">含み損益 '+signed(pl)+'</span>'; }
+  if($('tmFresh')) $('tmFresh').innerHTML=freshHtml();
   const m = new Date().getMonth();
   $('tmMonthLb').textContent = (m+1)+'月の優待・配当 ›';
   let html = '—';
@@ -1758,6 +1783,7 @@ function render(d){
     /* 評価額は株価×株数を優先（毎朝の株価自動更新でG列が古くても正しい値になる）。どちらか欠けたらG列の値 */
     const value = (cur&&sh) ? Math.round(cur*sh) : rawVal;
     if(value===null)continue;
+    if(sh===0)continue;
     const acct=(r[2]||'').trim();
     const gross=num(r[8])||0;
     holdings.push({name,code:String(r[0]||'').trim(),acct,shares:sh,acqPrice:num(r[4]),curPrice:cur,
@@ -1768,6 +1794,8 @@ function render(d){
   const totalDiv=holdings.reduce((s,h)=>s+h.divTotal,0);
   const totalYval=holdings.reduce((s,h)=>s+h.yval,0);
   $('k-port').textContent=yen(totalVal);
+  if($('ycalFresh')) $('ycalFresh').innerHTML=freshHtml();
+  if($('k-portFresh')) $('k-portFresh').innerHTML=freshHtml();
   $('k-port-sub').textContent=holdings.length+'銘柄'+(latest&&latest.rk+latest.nikko+latest.sbi>0?' / 証券資産の'+Math.round(totalVal/(latest.rk+latest.nikko+latest.sbi)*100)+'%':'');
   if($('k-allstocks')) $('k-allstocks').textContent=holdings.length+'銘柄';
   const totalNet = holdings.reduce((s,h)=>s+h.divNet,0);
@@ -2258,7 +2286,8 @@ function showPortBreakdown(){
   const hs = [...(window.__holdings||[])].sort((a,b)=>b.value-a.value);
   if(!hs.length){openModal('<h3>優待株評価額</h3><div class="sub">データなし</div>');return;}
   const total = hs.reduce((s,h)=>s+h.value,0);
-  let html = `<h3>優待株評価額の内訳</h3><div class="sub">${hs.length}銘柄・合計 ${yen(total)}。銘柄クリックで詳細</div>`;
+  const fi=freshInfo();
+  let html = `<h3>優待株評価額の内訳</h3><div class="sub">${hs.length}銘柄・合計 ${yen(total)}。銘柄クリックで詳細</div><div class="sub" style="margin-top:2px;">${freshHtml()}</div>${fi.failed?`<div class="sub" style="font-size:11px;">株価を取れなかった銘柄：${fi.failed}</div>`:''}`;
   hs.forEach(h=>{
     const pct = (h.value/total*100).toFixed(1);
     html += `<div class="mrow clickable" onclick="showStock('${(h.name+'|'+h.acct).replace(/'/g,"\\'")}')">
