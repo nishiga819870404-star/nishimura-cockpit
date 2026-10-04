@@ -232,7 +232,7 @@ canvas{max-width:100%;}
 .modal{background:#fff;border-radius:16px;max-width:640px;width:100%;max-height:82vh;overflow-y:auto;padding:22px;box-shadow:0 12px 40px rgba(30,40,90,0.25);}
 .modal h3{font-size:16px;font-weight:900;color:var(--header);margin-bottom:4px;}
 .modal .sub{font-size:11.5px;color:var(--dim);margin-bottom:14px;}
-.modal .close{float:right;background:#F0F2FA;border:none;border-radius:7px;padding:6px 12px;font-weight:700;cursor:pointer;color:var(--dim);}
+.modal .close{position:sticky;top:-22px;float:right;z-index:5;background:#F0F2FA;border:none;border-radius:7px;padding:6px 12px;font-weight:700;cursor:pointer;color:var(--dim);box-shadow:0 2px 6px rgba(30,40,90,.12);}
 .badge{display:inline-block;font-size:10px;font-weight:800;border-radius:5px;padding:2px 7px;margin-left:6px;}
 .badge.ok{background:#E3F7EF;color:#1B9E77;}
 .badge.wait{background:#FFF3E0;color:#C77700;}
@@ -1220,7 +1220,7 @@ function syncTabs(page){
   st.hidden=items.length<2;
   st.innerHTML=items.map(x=>'<button data-p="'+x[0]+'" class="'+(x[0]===page?'on':'')+'">'+x[1]+'</button>').join('');
 }
-document.querySelectorAll('.navitem').forEach(el=>el.addEventListener('click',()=>{syncTabs(el.dataset.page);window.scrollTo(0,0);}));
+document.querySelectorAll('.navitem').forEach(el=>el.addEventListener('click',()=>{try{closeModal();}catch(e){} if(window.__qClose)window.__qClose(); syncTabs(el.dataset.page);window.scrollTo(0,0);}));
 document.querySelectorAll('#mainTabs .tab').forEach(t=>t.addEventListener('click',()=>{
   const g=t.dataset.g, pg=lastInG[g]||TABG[g][0][0];
   const n=document.querySelector('.navitem[data-page="'+pg+'"]'); if(n) n.click();
@@ -2941,7 +2941,11 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
 #qFab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));width:60px;height:60px;border-radius:50%;border:none;background:var(--header);color:#fff;font-size:32px;line-height:60px;box-shadow:0 6px 18px rgba(60,70,120,.35);cursor:pointer;z-index:900;}
 #qSheet{position:fixed;inset:0;background:rgba(20,24,40,.45);z-index:950;display:flex;align-items:flex-end;justify-content:center;}
 #qSheet.hidden{display:none;}
-#qSheet .qbox{background:var(--card);width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));}
+#qSheet .qbox{background:var(--card);width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:0 16px calc(18px + env(safe-area-inset-bottom));max-height:calc(100dvh - 20px);max-height:calc(100vh - 20px);overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#qSheet .qhead{position:sticky;top:0;z-index:3;background:var(--card);display:flex;align-items:center;gap:8px;padding:12px 0 10px;margin-bottom:4px;border-bottom:1px solid var(--line);}
+#qSheet .qhead b{flex:1;font-size:15px;color:var(--header);}
+#qSheet .qhead button{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;}
+.qtoast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom));background:#1F2340;color:#fff;border-radius:12px;padding:10px 16px;font-size:13px;z-index:1000;max-width:90vw;box-shadow:0 6px 20px rgba(0,0,0,.25);}
 #qSheet .qtabs{display:flex;gap:6px;margin-bottom:14px;}
 #qSheet .qtabs button{flex:1;padding:10px 0;white-space:nowrap;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:14px;font-weight:700;color:var(--text);cursor:pointer;}
 #qSheet .qtabs button.on{background:var(--header);color:#fff;border-color:var(--header);}
@@ -2969,6 +2973,7 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
 <button id="qFab" aria-label="記録する">＋</button>
 <div id="qSheet" class="hidden">
   <div class="qbox">
+    <div class="qhead"><b>＋ 記録する</b><button type="button" id="qHome">🏠 ホーム</button><button type="button" id="qClose">✕ 閉じる</button></div>
     <div class="qtabs">
       <button data-q="photo" class="on">📷 写真</button>
       <button data-q="meal">🍚 食事</button>
@@ -3067,8 +3072,15 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
     if(typeof CFG==='undefined'||!CFG||!CFG.gas){alert('先に ⚙設定 で受付窓口URLと合言葉を入れてください');return;}
     $q('qMsg').textContent='';$q('qMealType').value=autoType();$q('qMealDay').value='0';$q('qPhotoDay').value='0';drawPresets();drawRecent();$q('qSheet').classList.remove('hidden');
   };
-  const close=()=>$q('qSheet').classList.add('hidden');
+  const close=()=>{ if($q('qSheet').classList.contains('hidden')) return; $q('qSheet').classList.add('hidden'); if(history.state&&history.state.qs) history.back(); };
+  window.__qClose=close;
+  $q('qClose').addEventListener('click',close);
+  $q('qHome').addEventListener('click',()=>{close(); const t=document.querySelector('#mainTabs .tab[data-g="today"]'); if(t)t.click(); window.scrollTo(0,0);});
+  /* iPhoneの戻るスワイプ・ブラウザの戻るで閉じる */
   $q('qFab').addEventListener('click',open);
+  $q('qFab').addEventListener('click',()=>{ if(!$q('qSheet').classList.contains('hidden')) try{history.pushState({qs:1},'');}catch(e){} });
+  window.addEventListener('popstate',()=>{ if(!$q('qSheet').classList.contains('hidden')) $q('qSheet').classList.add('hidden'); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') close(); });
   $q('qSheet').addEventListener('click',e=>{if(e.target.id==='qSheet')close();});
   document.querySelectorAll('#qSheet .qtabs button').forEach(b=>b.addEventListener('click',()=>{
     mode=b.dataset.q;
@@ -3135,6 +3147,9 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
       photos=[]; picked={}; pickedR={}; drawRecent(); $q('qFile').value=''; $q('qPreview').style.display='none';
       ['qNote','qKg','qFat','qText','qMealText','qTrade'].forEach(id=>$q(id).value=''); drawPresets();
       if(typeof boot==='function') setTimeout(boot,500);
+      /* 記録できたら元の画面に戻す */
+      const msg=$q('qMsg').textContent;
+      setTimeout(()=>{ close(); const t=document.createElement('div'); t.className='qtoast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3500); },900);
     }catch(e){
       $q('qMsg').textContent='⚠️ '+(done.length?done.length+'件は記録済み。残りで失敗：':'')+(e.message||e)+'（時間をおいてもう一度）';
     }finally{$q('qSend').disabled=false;}
