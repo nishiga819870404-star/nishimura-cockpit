@@ -424,8 +424,50 @@ function sheetOps_(b) {
 
 /* ================= 株価の自動更新・更新日の記録 ================= */
 
-/* ポートフォリオの全銘柄の株価を GOOGLEFINANCE で取り直し、現在株価・評価額を更新して株価履歴に1日1回記録する。
-   毎日16時のトリガー（setupTriggers で作る）と、定期実行からの {type:'prices'} で動く */
+/* 株価をネットから取る（無料・キー不要）。①Yahoo!ファイナンスのチャートデータ ②取れなければ Stooq。
+   GOOGLEFINANCE はApps Scriptから値を読めない仕様なので使わない */
+function fetchPrices_(codes) {
+  const out = {};
+  const ua = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15' };
+  for (let s = 0; s < codes.length; s += 20) {
+    const part = codes.slice(s, s + 20);
+    const res = UrlFetchApp.fetchAll(part.map(function (c) {
+      return { url: 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(c) + '.T?range=5d&interval=1d', muteHttpExceptions: true, headers: ua };
+    }));
+    res.forEach(function (r, k) {
+      try {
+        if (r.getResponseCode() !== 200) return;
+        const m = JSON.parse(r.getContentText()).chart.result[0].meta;
+        const p = Number(m.regularMarketPrice || m.previousClose);
+        if (p > 0) out[part[k]] = p;
+      } catch (e) {}
+    });
+    if (s + 20 < codes.length) Utilities.sleep(500);
+  }
+  const rest = codes.filter(function (c) { return !out[c]; });
+  for (let s = 0; s < rest.length; s += 20) {
+    const part = rest.slice(s, s + 20);
+    const res = UrlFetchApp.fetchAll(part.map(function (c) {
+      return { url: 'https://stooq.com/q/l/?s=' + encodeURIComponent(c.toLowerCase()) + '.jp&f=sd2t2c&h&e=csv', muteHttpExceptions: true, headers: ua };
+    }));
+    res.forEach(function (r, k) {
+      try {
+        const lines = r.getContentText().trim().split(/\r?\n/);
+        const p = Number((lines[1] || '').split(',')[3]);
+        if (p > 0) out[part[k]] = p;
+      } catch (e) {}
+    });
+  }
+  return out;
+}
+
+/* 動作確認用：エディタで実行すると、3銘柄だけ株価を取ってログに出す（スプシは書き換えない） */
+function testPrices() {
+  console.log(JSON.stringify(fetchPrices_(['7203', '7864', '2914'])));
+}
+
+/* ポートフォリオの全銘柄の株価を取り直し、現在株価・評価額を更新して株価履歴に1日1回記録する。
+   毎日16時のトリガー（setupTriggers で作る）と、{type:'prices'} で動く */
 function updatePrices_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(SHEETS.port);
@@ -441,21 +483,8 @@ function updatePrices_() {
     const code = String(v[i][cCode] || '').trim();
     if (/^[0-9][0-9A-Z]{3}$/.test(code)) rows.push(i);
   }
-  let tmp = ss.getSheetByName('株価取得');
-  if (!tmp) { tmp = ss.insertSheet('株価取得'); tmp.hideSheet(); }
-  tmp.clear();
-  if (!rows.length) return { ok: true, updated: 0 };
-  tmp.getRange(1, 1, rows.length, 2).setValues(rows.map(function (i) {
-    const code = String(v[i][cCode]).trim();
-    return [code, '=IFERROR(GOOGLEFINANCE("TYO:' + code + '","price"),"")'];
-  }));
-  let got = [];
-  for (let t = 0; t < 4; t++) {
-    SpreadsheetApp.flush();
-    Utilities.sleep(2500 + t * 2500);
-    got = tmp.getRange(1, 2, rows.length, 1).getValues().map(function (r) { return r[0]; });
-    if (!got.some(function (x) { return String(x).indexOf('Loading') >= 0; })) break;
-  }
+  const codes = rows.map(function (i) { return String(v[i][cCode]).trim(); });
+  const got = fetchPrices_(codes);
   const today = today_();
   const hist = sheet_(SHEETS.kabuhist);
   if (hist.getLastRow() === 0) hist.appendRow(['日付', '銘柄コード', '銘柄名', '株価']);
@@ -466,7 +495,7 @@ function updatePrices_() {
   let n = 0;
   rows.forEach(function (i, k) {
     const code = String(v[i][cCode]).trim(), name = v[i][cName];
-    const p = Number(got[k]);
+    const p = Number(got[codes[k]]);
     if (!p || p <= 0) { failed.push(name + '(' + code + ')'); return; }
     /* 桁ずれ防止：取得単価から10倍以上ずれる値は書かない */
     const acq = num_(cAcq >= 0 ? v[i][cAcq] : null);
