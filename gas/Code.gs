@@ -56,6 +56,22 @@ function doGet(e) {
   if (!checkKey_(p.key)) return json_({ ok: false, error: '合言葉が違います' });
   if (p.ping) return json_({ ok: true, sheets: listSheets_() });
   if (p.pending) return json_(pendingPhotos_(parseInt(p.limit, 10) || 5));
+  return ContentService.createTextOutput(allJson_(!!p.fresh)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/* 全シートの読み出し。毎回スプシを読むと遅い（ときに1分以上）ので、結果を30分キャッシュする。
+   書き込み・株価更新のたびにキャッシュは捨てる。キャッシュは1件100KBまでなので分割して保存 */
+function allJson_(fresh) {
+  const c = CacheService.getScriptCache();
+  if (!fresh) {
+    const n = parseInt(c.get('ALL_N') || '0', 10);
+    if (n) {
+      const keys = [];
+      for (let i = 0; i < n; i++) keys.push('ALL_' + i);
+      const got = c.getAll(keys);
+      if (keys.every(function (k) { return got[k] != null; })) return keys.map(function (k) { return got[k]; }).join('');
+    }
+  }
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const data = {};
   Object.keys(SHEETS).forEach(function (k) {
@@ -63,13 +79,24 @@ function doGet(e) {
     data[k] = sh ? sh.getDataRange().getDisplayValues() : null;
   });
   data.meta = meta_();
-  return json_({ ok: true, updated: now_(), data: data });
+  const out = JSON.stringify({ ok: true, updated: now_(), data: data });
+  try {
+    const size = 90000, parts = {};
+    let n = 0;
+    for (let i = 0; i < out.length; i += size) parts['ALL_' + (n++)] = out.slice(i, i + size);
+    if (n <= 40) { c.putAll(parts, 1800); c.put('ALL_N', String(n), 1800); }
+  } catch (e) {}
+  return out;
 }
+function bustCache_() { try { CacheService.getScriptCache().remove('ALL_N'); } catch (e) {} }
+/* 30分ごとにキャッシュを作り直しておく（開いた瞬間に速く出るように） */
+function warmCache() { bustCache_(); allJson_(true); }
 
 function doPost(e) {
   let body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return json_({ ok: false, error: 'JSONが読めません' }); }
   if (!checkKey_(body.key)) return json_({ ok: false, error: '合言葉が違います' });
+  bustCache_();
   try {
     switch (body.type) {
       case 'weight': return json_(addWeight_(body));
@@ -537,14 +564,16 @@ function meta_() {
 
 /* 最初に1回だけ手で実行：毎日16時（大引け後）に株価を自動更新するトリガーを作る */
 function setupTriggers() {
-  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'dailyPrices') ScriptApp.deleteTrigger(t); });
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'dailyPrices' || t.getHandlerFunction() === 'warmCache') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('dailyPrices').timeBased().everyDays(1).atHour(16).inTimezone(TZ).create();
+  ScriptApp.newTrigger('warmCache').timeBased().everyMinutes(30).create();
   const r = updatePrices_();
   const dup = clearDupPort_();
   console.log('重複行の整理: ' + dup + '行');
-  console.log('トリガー作成OK。今回の株価更新: ' + r.updated + '銘柄' + (r.failed && r.failed.length ? '／取得できず: ' + r.failed.join(', ') : ''));
+  warmCache();
+  console.log('トリガー作成OK（株価：毎日16時／読み込み高速化：30分ごと）。今回の株価更新: ' + r.updated + '銘柄' + (r.failed && r.failed.length ? '／取得できず: ' + r.failed.join(', ') : ''));
 }
-function dailyPrices() { updatePrices_(); clearDupPort_(); }
+function dailyPrices() { updatePrices_(); clearDupPort_(); warmCache(); }
 
 /* ポートフォリオの完全に同じ重複行だけを空にする（最初の1行は残す）。中身の違う行は消さない */
 function clearDupPort_() {
