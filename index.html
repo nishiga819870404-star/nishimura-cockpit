@@ -1615,14 +1615,20 @@ async function boot(){
       /* 受付窓口（Google）はたまに最初の1回だけ1分以上かかる。前回のデータを出したまま待ち、だめなら1回だけ取り直す */
       const tryGet=async ms=>{
         const ctl=new AbortController(); const tm=setTimeout(()=>ctl.abort(),ms);
-        try{ const r=await fetch(CFG.gas+'?key='+encodeURIComponent(CFG.key)+'&ts='+Date.now(),{signal:ctl.signal}); return await r.json(); }
+        try{
+          const r=await fetch(CFG.gas+'?key='+encodeURIComponent(CFG.key)+'&ts='+Date.now(),{signal:ctl.signal});
+          const t=await r.text();
+          /* Google側の一時エラーだとJSONでなくエラーページが返る */
+          try{ return JSON.parse(t); }catch(pe){ const er=new Error('窓口が一時的にエラーを返しました'); er.name='Busy'; throw er; }
+        }
         finally{ clearTimeout(tm); }
       };
       let j;
       try{ j=await tryGet(45000); }
       catch(e1){
-        if(e1.name!=='AbortError') throw e1;
+        if(e1.name!=='AbortError'&&e1.name!=='Busy'&&e1.name!=='TypeError') throw e1;
         if(boot._drawn) $('stamp').textContent='前回のデータを表示中・窓口が混んでいるので再取得中…';
+        await new Promise(r=>setTimeout(r,3000));
         j=await tryGet(75000);
       }
       if(!j.ok) throw new Error(j.error||'読み込み失敗');
@@ -1633,7 +1639,7 @@ async function boot(){
         try{const lite={...pre,meisai:null};localStorage.setItem('nosCache',JSON.stringify({at,data:lite}));}catch(e2){}
       }
     }catch(e){
-      if(e.name==='AbortError'&&boot._drawn){ boot._soft='前回のデータを表示中（窓口が混んでいます。少しして🔄更新）'; }
+      if((e.name==='AbortError'||e.name==='Busy'||e.name==='TypeError')&&boot._drawn){ boot._soft='前回のデータを表示中（窓口が混んでいます。少しして🔄更新）'; }
       else errs.push('受付窓口: '+(e.name==='AbortError'?'応答がありません（2分）。少し時間をおいて🔄更新してください':(e.message||e)));
     }
   }
