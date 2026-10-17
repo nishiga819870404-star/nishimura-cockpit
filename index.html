@@ -1151,7 +1151,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-17c';
+const APP_BUILD='2026-10-17d';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
@@ -3244,7 +3244,19 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
     $q('qSend').disabled=true; $q('qMsg').textContent='送信中…';
     const done=[];
     try{
-      for(const b of jobs){ const j=await post(b); done.push(j.message||'記録しました'); }
+      /* 1件ずつ送る。窓口（Google）がたまに一時エラーを返すので、失敗したら2秒おいて最大2回まで送り直す */
+      for(let i=0;i<jobs.length;i++){
+        const b=jobs[i];
+        if(jobs.length>1) $q('qMsg').textContent='送信中… '+(i+1)+'/'+jobs.length;
+        let j=null, err=null;
+        for(let t=0;t<3;t++){
+          try{ j=await post(b); err=null; break; }catch(e){ err=e; await new Promise(r=>setTimeout(r,2000)); }
+        }
+        if(err){ err.message=String(err.message||err).replace('合言葉が違います','窓口が一時的に応答しませんでした'); throw err; }
+        done.push(j.message||'記録しました');
+        /* 記録できた写真は手元のリストから外す（失敗後にもう一度押しても二重に記録しない） */
+        if(b.type==='photo'){ const k=photos.indexOf(b.data); if(k>=0) photos.splice(k,1); }
+      }
       $q('qMsg').textContent='✅ '+(done.length>1?done.length+'件：':'')+done[done.length-1];
       photos=[]; picked={}; pickedR={}; drawRecent(); $q('qFile').value=''; $q('qPreview').style.display='none';
       ['qNote','qKg','qFat','qText','qMealText','qTrade'].forEach(id=>$q(id).value=''); drawPresets();
@@ -3253,7 +3265,8 @@ document.querySelectorAll("[data-peng]").forEach(el=>{el.src=PENG[el.dataset.pen
       const msg=$q('qMsg').textContent;
       setTimeout(()=>{ close(); const t=document.createElement('div'); t.className='qtoast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3500); },900);
     }catch(e){
-      $q('qMsg').textContent='⚠️ '+(done.length?done.length+'件は記録済み。残りで失敗：':'')+(e.message||e)+'（時間をおいてもう一度）';
+      if(mode==='photo'&&done.length&&photos.length){ $q('qPreview').src='data:image/jpeg;base64,'+photos[0]; }
+      $q('qMsg').textContent='⚠️ '+(done.length?done.length+'件は記録済み（残り'+(mode==='photo'?photos.length+'枚':'')+'はこのまま「記録する」を押せば続きから送れます）。失敗：':'')+(e.message||e);
     }finally{$q('qSend').disabled=false;}
   });
 })();
