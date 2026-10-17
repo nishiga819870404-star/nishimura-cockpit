@@ -1156,7 +1156,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-18b';
+const APP_BUILD='2026-10-18c';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
@@ -2686,7 +2686,10 @@ function ytdData(){
   for(let pm=0; pm<nowM; pm++){
     cal[pm].div.forEach(x=>div.push({m:pm+1, ...x}));
     const r=(pm+9)%12;  /* この月に届く＝3ヶ月前に権利確定 */
-    cal[r].yutai.filter(x=>x.e.s==='ok').forEach(x=>yut.push({m:pm+1, rm:r+1, h:x.h, kind:yutaiKind(x.h)}));
+    cal[r].yutai.filter(x=>x.e.s==='ok').forEach(x=>{
+      const nRights=Math.max(1,(String(x.h.rights).match(/(\d+)月/g)||[]).length);
+      yut.push({m:pm+1, rm:r+1, h:x.h, kind:yutaiKind(x.h), amt:Math.round((x.h.yval||0)/nRights)});
+    });
   }
   const cur=cal[nowM].div.reduce((s,x)=>s+x.amt,0);
   return {div, yut, nowM, cur};
@@ -2699,7 +2702,8 @@ function renderYtd(){
   $('y-ytd-div-sub').textContent='1〜'+t.nowM+'月の目安'+(dNet?'（税引後）':'（税引前）')+(t.cur?'・今月予定 '+yen(t.cur):'');
   const kinds={}; t.yut.forEach(x=>kinds[x.kind]=(kinds[x.kind]||0)+1);
   $('y-ytd-yutai').textContent=t.yut.length+'件';
-  $('y-ytd-yutai-sub').textContent=Object.keys(kinds).sort((a,b)=>kinds[b]-kinds[a]).slice(0,3).map(k=>(YK_ICON[k]||'')+k+kinds[k]).join(' ')||'1〜'+t.nowM+'月';
+  const amtBy={}; t.yut.forEach(x=>amtBy[x.kind]=(amtBy[x.kind]||0)+x.amt);
+  $('y-ytd-yutai-sub').textContent=Object.keys(kinds).sort((a,b)=>(amtBy[b]-amtBy[a])||(kinds[b]-kinds[a])).slice(0,3).map(k=>(YK_ICON[k]||'')+k+(amtBy[k]?' '+yen(amtBy[k]):' '+kinds[k]+'件')).join(' ')||'1〜'+t.nowM+'月';
 }
 function showYtdDiv(){
   const t=ytdData(); if(!t) return;
@@ -2722,12 +2726,19 @@ function showYtdYutai(kind){
   const kinds={}; t.yut.forEach(x=>kinds[x.kind]=(kinds[x.kind]||0)+1);
   const list=kind?t.yut.filter(x=>x.kind===kind):t.yut;
   const chip=(k,label,n)=>`<button onclick="showYtdYutai(${k?`'${k}'`:''})" style="border:1px solid var(--line);border-radius:16px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;background:${(kind||'')===(k||'')?'var(--header)':'#fff'};color:${(kind||'')===(k||'')?'#fff':'#5B6478'};">${label} ${n}</button>`;
-  let html=`<h3>今年もらった優待 🎉</h3><div class="sub">1〜${t.nowM}月に届いた（はずの）優待 <b>${t.yut.length}件</b>。権利確定の約3ヶ月後に届くとみなした目安です</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px;">${chip('','すべて',t.yut.length)}${Object.keys(kinds).sort((a,b)=>kinds[b]-kinds[a]).map(k=>chip(k,(YK_ICON[k]||'')+' '+k,kinds[k])).join('')}</div>`;
+  const amtBy={}; t.yut.forEach(x=>amtBy[x.kind]=(amtBy[x.kind]||0)+x.amt);
+  const ks=Object.keys(kinds).sort((a,b)=>(amtBy[b]-amtBy[a])||(kinds[b]-kinds[a]));
+  const card=k=>`<div onclick="showYtdYutai('${k}')" style="cursor:pointer;border:1.5px solid ${kind===k?'var(--header)':'var(--line)'};background:${kind===k?'#EEF0FB':'#fff'};border-radius:12px;padding:8px 10px;">
+      <div style="font-size:12px;font-weight:800;">${YK_ICON[k]||'🎁'} ${k}</div>
+      <div style="font-size:17px;font-weight:900;margin-top:2px;">${amtBy[k]?yen(amtBy[k])+'<span style="font-size:10px;color:var(--dim);font-weight:700;">分</span>':'—'}</div>
+      <div style="font-size:11px;color:var(--dim);">${kinds[k]}件</div></div>`;
+  let html=`<h3>今年もらった優待 🎉</h3><div class="sub">1〜${t.nowM}月に届いた（はずの）優待 <b>${t.yut.length}件</b>・金額にできるもの合計 <b>${yen(t.yut.reduce((s,x)=>s+x.amt,0))}分</b>。権利確定の約3ヶ月後に届くとみなした目安です（金額は保有株一覧の優待価値から）</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:10px 0 6px;">${ks.map(card).join('')}</div>
+    <div style="margin-bottom:4px;">${chip('','すべて表示',t.yut.length)}</div>`;
   for(let m=1;m<=t.nowM;m++){
     const a=list.filter(x=>x.m===m); if(!a.length) continue;
     html+=`<h4 style="font-size:13px;font-weight:900;margin:14px 0 4px;">${m}月に届いた <span style="color:var(--dim);font-weight:700;">（${a.length}件）</span></h4>`;
-    html+=a.map(x=>`<div class="mrow clickable" onclick="showStock('${(x.h.name+'|'+x.h.acct).replace(/'/g,"\\'")}')"><div style="font-size:20px;margin-right:8px;align-self:center;">${YK_ICON[x.kind]||'🎁'}</div><div style="flex:1;"><span class="nm">${x.h.name}</span> <span class="catchip" style="font-size:9px;">${x.kind}</span><div class="dt">${x.h.yutaiFull||x.h.yutai}（${x.rm}月権利）</div></div><div style="color:var(--dim);font-size:16px;align-self:center;">›</div></div>`).join('');
+    html+=a.map(x=>`<div class="mrow clickable" onclick="showStock('${(x.h.name+'|'+x.h.acct).replace(/'/g,"\\'")}')"><div style="font-size:20px;margin-right:8px;align-self:center;">${YK_ICON[x.kind]||'🎁'}</div><div style="flex:1;"><span class="nm">${x.h.name}</span> <span class="catchip" style="font-size:9px;">${x.kind}</span><div class="dt">${x.h.yutaiFull||x.h.yutai}（${x.rm}月権利）</div></div>${x.amt?`<div class="amt" style="align-self:center;margin-left:8px;">${yen(x.amt)}</div>`:''}<div style="color:var(--dim);font-size:16px;align-self:center;margin-left:6px;">›</div></div>`).join('');
   }
   if(!list.length) html+='<div class="sub" style="margin-top:10px;">なし</div>';
   window.__stockCtx={keys:list.map(x=>x.h.name+'|'+x.h.acct).filter((v,i,a)=>a.indexOf(v)===i),cur:null,back:()=>showYtdYutai(kind)};
