@@ -596,10 +596,15 @@ canvas{max-width:100%;}
           <div class="val" id="y-div-now">—</div>
           <div class="sub">権利確定の約3ヶ月後に支払と仮定（タップで前月・次月も）</div>
         </div>
-        <div class="kpi" style="--accent:var(--amber)">
-          <div class="lb">年間優待価値（推定）</div>
-          <div class="val" id="y-value">—</div>
-          <div class="sub" id="y-value-sub">—</div>
+        <div class="kpi clickable" style="--accent:var(--amber)" onclick="showYtdDiv()" title="タップで月ごとに見る">
+          <div class="lb">今年もらった配当 ›</div>
+          <div class="val" id="y-ytd-div">—</div>
+          <div class="sub" id="y-ytd-div-sub">—</div>
+        </div>
+        <div class="kpi clickable" style="--accent:var(--pink,#F06E9C)" onclick="showYtdYutai()" title="タップでもらった優待を見る">
+          <div class="lb">今年もらった優待 ›</div>
+          <div class="val" id="y-ytd-yutai">—</div>
+          <div class="sub" id="y-ytd-yutai-sub">—</div>
         </div>
       </div>
 
@@ -1151,7 +1156,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-18a';
+const APP_BUILD='2026-10-18b';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
@@ -2064,7 +2069,7 @@ const _payNew=(r[6]||'').trim();
       const e = eligibility(h, now);
       const months=(h.rights.match(/(\d+)月/g)||[]).map(m=>parseInt(m)-1).filter(m=>m>=0&&m<12);
       months.forEach(m=>{
-        if(h.yutai && (!eligOnlyFlag || e.s==='ok')) cal[m].yutai.push({h, e});
+        if(hasYutai(h) && (!eligOnlyFlag || e.s==='ok')) cal[m].yutai.push({h, e});
         if(h.divTotal>0&&months.length>0){
           cal[(m+3)%12].div.push({name:h.name, amt:h.divTotal/months.length, net:h.divNet/months.length, acct:h.acct});
         }
@@ -2092,8 +2097,7 @@ const _payNew=(r[6]||'').trim();
   }
   $('eligOnly').onchange = renderCal;
   renderCal();
-  $('y-value').textContent=totalYval?yen(totalYval):'—';
-  $('y-value-sub').textContent='優待内容の推定価値の合計';
+  renderYtd();
 
   /* holdings table (クリックで個別モーダル) */
   window.__divHist = parseDivHist(d.hist);
@@ -2655,6 +2659,80 @@ function stockNavBack(){
   if(c && typeof c.back === 'function') c.back(); else closeModal();
 }
 
+/* 優待があるか（「なし」「廃止」「対象外」は除く） */
+function hasYutai(h){
+  if(!h.yutai) return false;
+  if(/^なし$/.test(String(h.ytype||'').trim())) return false;
+  return !/優待なし|廃止|対象外/.test(h.yutaiFull||'');
+}
+/* 優待の種類（カテゴリ分け用） */
+function yutaiKind(h){
+  const t=(h.ytype||'')+' '+(h.yutaiFull||'');
+  if(/クオ|QUO/i.test(t)) return 'QUOカード';
+  if(/カタログ/.test(t)) return 'カタログギフト';
+  if(/お米|おこめ/.test(t)) return 'お米・お米券';
+  if(/ポイント|ウォレット|暗号|XRP|PayPay|ポンタ|majica/i.test(t)) return 'ポイント・電子マネー';
+  if(/割引|クーポン|買物|優待券|入浴|チケット|鉄道/.test(t)) return '割引券・クーポン';
+  if(/ギフトカード|商品券|図書/.test(t)) return 'ギフトカード・商品券';
+  return '自社商品';
+}
+const YK_ICON={'QUOカード':'💳','カタログギフト':'📖','お米・お米券':'🍚','ポイント・電子マネー':'🪙','割引券・クーポン':'🎟️','ギフトカード・商品券':'🎁','自社商品':'📦'};
+/* 今年（1月〜先月まで）にもらったはずの配当・優待。配当は「権利確定＋3ヶ月」、優待は「権利確定＋3ヶ月」に届くとみなす（月1回の目安） */
+function ytdData(){
+  const now=window.__now||new Date(), nowM=now.getMonth();
+  const cal=window.__buildCal?window.__buildCal(false):null;
+  if(!cal) return null;
+  const div=[], yut=[];
+  for(let pm=0; pm<nowM; pm++){
+    cal[pm].div.forEach(x=>div.push({m:pm+1, ...x}));
+    const r=(pm+9)%12;  /* この月に届く＝3ヶ月前に権利確定 */
+    cal[r].yutai.filter(x=>x.e.s==='ok').forEach(x=>yut.push({m:pm+1, rm:r+1, h:x.h, kind:yutaiKind(x.h)}));
+  }
+  const cur=cal[nowM].div.reduce((s,x)=>s+x.amt,0);
+  return {div, yut, nowM, cur};
+}
+function renderYtd(){
+  const t=ytdData(); if(!t||!$('y-ytd-div')) return;
+  const dNet=window.__divModeVal==='net';
+  const sum=t.div.reduce((s,x)=>s+(dNet?x.net:x.amt),0);
+  $('y-ytd-div').textContent=yen(sum);
+  $('y-ytd-div-sub').textContent='1〜'+t.nowM+'月の目安'+(dNet?'（税引後）':'（税引前）')+(t.cur?'・今月予定 '+yen(t.cur):'');
+  const kinds={}; t.yut.forEach(x=>kinds[x.kind]=(kinds[x.kind]||0)+1);
+  $('y-ytd-yutai').textContent=t.yut.length+'件';
+  $('y-ytd-yutai-sub').textContent=Object.keys(kinds).sort((a,b)=>kinds[b]-kinds[a]).slice(0,3).map(k=>(YK_ICON[k]||'')+k+kinds[k]).join(' ')||'1〜'+t.nowM+'月';
+}
+function showYtdDiv(){
+  const t=ytdData(); if(!t) return;
+  const dNet=window.__divModeVal==='net';
+  const by={}; t.div.forEach(x=>{(by[x.m]=by[x.m]||[]).push(x);});
+  const total=t.div.reduce((s,x)=>s+x.amt,0), totalNet=t.div.reduce((s,x)=>s+x.net,0);
+  const maxV=Math.max(1,...Object.values(by).map(a=>a.reduce((s,x)=>s+x.amt,0)));
+  let html=`<h3>今年もらった配当</h3><div class="sub">1〜${t.nowM}月の合計 <b>${yen(total)}</b>（手取り目安 ${yen(totalNet)}）。「権利確定＋3ヶ月」に入るとみなした目安です</div>`;
+  for(let m=1;m<=t.nowM;m++){
+    const a=(by[m]||[]).sort((p,q)=>q.amt-p.amt), v=a.reduce((s,x)=>s+x.amt,0);
+    html+=`<h4 style="font-size:13px;font-weight:900;margin:14px 0 4px;display:flex;justify-content:space-between;"><span>${m}月</span><span style="color:var(--green)">${yen(v)}</span></h4>
+      <div style="height:6px;background:#EDF0F7;border-radius:3px;margin-bottom:4px;"><div style="height:6px;width:${Math.round(v/maxV*100)}%;background:var(--green);border-radius:3px;"></div></div>`;
+    html+=a.length?a.map(x=>`<div class="mrow clickable" onclick="showStock('${(x.name+'|'+x.acct).replace(/'/g,"\\'")}')"><div style="flex:1;"><span class="nm">${x.name}</span> <span class="catchip" style="font-size:9px;">${x.acct||''}</span></div><div class="amt">${yen(dNet?x.net:x.amt)}</div></div>`).join(''):'<div class="sub">なし</div>';
+  }
+  window.__stockCtx={keys:t.div.map(x=>x.name+'|'+x.acct).filter((v,i,a)=>a.indexOf(v)===i),cur:null,back:showYtdDiv};
+  openModal(html);
+}
+function showYtdYutai(kind){
+  const t=ytdData(); if(!t) return;
+  const kinds={}; t.yut.forEach(x=>kinds[x.kind]=(kinds[x.kind]||0)+1);
+  const list=kind?t.yut.filter(x=>x.kind===kind):t.yut;
+  const chip=(k,label,n)=>`<button onclick="showYtdYutai(${k?`'${k}'`:''})" style="border:1px solid var(--line);border-radius:16px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;background:${(kind||'')===(k||'')?'var(--header)':'#fff'};color:${(kind||'')===(k||'')?'#fff':'#5B6478'};">${label} ${n}</button>`;
+  let html=`<h3>今年もらった優待 🎉</h3><div class="sub">1〜${t.nowM}月に届いた（はずの）優待 <b>${t.yut.length}件</b>。権利確定の約3ヶ月後に届くとみなした目安です</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px;">${chip('','すべて',t.yut.length)}${Object.keys(kinds).sort((a,b)=>kinds[b]-kinds[a]).map(k=>chip(k,(YK_ICON[k]||'')+' '+k,kinds[k])).join('')}</div>`;
+  for(let m=1;m<=t.nowM;m++){
+    const a=list.filter(x=>x.m===m); if(!a.length) continue;
+    html+=`<h4 style="font-size:13px;font-weight:900;margin:14px 0 4px;">${m}月に届いた <span style="color:var(--dim);font-weight:700;">（${a.length}件）</span></h4>`;
+    html+=a.map(x=>`<div class="mrow clickable" onclick="showStock('${(x.h.name+'|'+x.h.acct).replace(/'/g,"\\'")}')"><div style="font-size:20px;margin-right:8px;align-self:center;">${YK_ICON[x.kind]||'🎁'}</div><div style="flex:1;"><span class="nm">${x.h.name}</span> <span class="catchip" style="font-size:9px;">${x.kind}</span><div class="dt">${x.h.yutaiFull||x.h.yutai}（${x.rm}月権利）</div></div><div style="color:var(--dim);font-size:16px;align-self:center;">›</div></div>`).join('');
+  }
+  if(!list.length) html+='<div class="sub" style="margin-top:10px;">なし</div>';
+  window.__stockCtx={keys:list.map(x=>x.h.name+'|'+x.h.acct).filter((v,i,a)=>a.indexOf(v)===i),cur:null,back:()=>showYtdYutai(kind)};
+  openModal(html);
+}
 function showMonth(mIdx){
   if(!window.__buildCal) return;
   mIdx = ((mIdx%12)+12)%12;
