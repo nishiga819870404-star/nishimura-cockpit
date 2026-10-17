@@ -1151,7 +1151,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-17b';
+const APP_BUILD='2026-10-17c';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
@@ -1575,7 +1575,7 @@ function bigCat(item){
 
 /* ---- modal ---- */
 function openModal(html){
-  closeModal();
+  closeModal(); window.__modalRe=null;
   const ov=document.createElement('div');
   ov.className='overlay'; ov.id='ov';
   ov.innerHTML='<div class="modal"><button class="close" onclick="closeModal()">✕ 閉じる</button>'+html+'</div>';
@@ -1669,6 +1669,8 @@ async function boot(){
   try{
     render({snap,cf,port,loan,meisai,report,hist,fixed,income,watch,wish,meal,weight});
     try{ todayMoney(); }catch(e){}
+    /* 前回データで開いていた一覧は、最新データで描き直す（更新日・株価を最新に） */
+    if($('ov')&&window.__modalRe){ try{ const md=document.querySelector('#ov .modal'), st=md?md.scrollTop:0; window.__modalRe(); const m2=document.querySelector('#ov .modal'); if(m2) m2.scrollTop=st; }catch(e){} }
     $('stamp').textContent='更新: '+new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   }catch(e){
     $('errbox').innerHTML='<div class="err">描画エラー: '+(e.message||e)+'<br>この画面のスクショをClaudeに送ってください。<br><span style="font-size:10px;">'+(e.stack||'').split('\n').slice(0,3).join('<br>')+'</span></div>';
@@ -2363,7 +2365,7 @@ function showPortBreakdown(sort){
       </div><div style="text-align:right;margin-left:12px;"><div class="amt">${yen(h.value)}</div><div class="dt">${pct}%</div></div></div>`;
   });
   window.__stockCtx = {keys: hs.map(h=>h.name+'|'+h.acct), cur:null, back: ()=>showPortBreakdown(sort)};
-  openModal(html);
+  openModal(html); window.__modalRe=()=>showPortBreakdown(sort);
 }
 function showAllStocks(sort){
   /* 保有株の全銘柄一覧（並び替えは sortStocks） */
@@ -2389,7 +2391,7 @@ function showAllStocks(sort){
         <div class="dt" style="color:${p==null?'var(--dim)':(p>=0?'var(--green)':'var(--red)')};font-weight:700;">${p==null?'単価未設定':signed(p)}</div></div></div>`;
   });
   window.__stockCtx = {keys: hs.map(h=>h.name+'|'+h.acct), cur:null, back: ()=>showAllStocks(sort)};
-  openModal(html);
+  openModal(html); window.__modalRe=()=>showAllStocks(sort);
 }
 function showDivBreakdown(){
   const dNet = window.__divModeVal==='net';
