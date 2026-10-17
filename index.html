@@ -404,7 +404,7 @@ canvas{max-width:100%;}
           <div><div class="tm-label">純資産</div><div style="font-size:20px;font-weight:900" id="tmNet">—</div></div>
           <div><div class="tm-label">株の評価額</div><div style="font-size:20px;font-weight:900" id="tmStock">—</div><div style="font-size:12px;font-weight:700" id="tmPl"></div></div>
         </div>
-        <div onclick="event.stopPropagation();__today.go('p-yutai')" style="border-top:1px solid var(--line);padding-top:10px">
+        <div onclick="event.stopPropagation();showMonth((window.__now||new Date()).getMonth())" style="border-top:1px solid var(--line);padding-top:10px">
           <div class="tm-label" id="tmMonthLb">今月の優待・配当</div>
           <div id="tmMonth" style="font-size:13px;line-height:1.8;margin-top:4px">—</div>
         </div>
@@ -586,15 +586,15 @@ canvas{max-width:100%;}
     <!-- ===== page: yutai ===== -->
     <section id="p-yutai" class="hidden">
       <div class="kpis">
-        <div class="kpi" style="--accent:var(--purple)">
-          <div class="lb">今月権利確定の優待</div>
+        <div class="kpi clickable" style="--accent:var(--purple)" onclick="showMonth((window.__now||new Date()).getMonth())" title="タップで月ごとの優待を見る">
+          <div class="lb">今月権利確定の優待 ›</div>
           <div class="val" id="y-now">—</div>
-          <div class="sub">銘柄</div>
+          <div class="sub">銘柄（タップで前月・次月も見られる）</div>
         </div>
-        <div class="kpi" style="--accent:var(--green)">
-          <div class="lb">今月の配当支払（目安）</div>
+        <div class="kpi clickable" style="--accent:var(--green)" onclick="showMonth((window.__now||new Date()).getMonth())" title="タップで月ごとの配当を見る">
+          <div class="lb">今月の配当支払（目安） ›</div>
           <div class="val" id="y-div-now">—</div>
-          <div class="sub">権利確定の約3ヶ月後に支払と仮定</div>
+          <div class="sub">権利確定の約3ヶ月後に支払と仮定（タップで前月・次月も）</div>
         </div>
         <div class="kpi" style="--accent:var(--amber)">
           <div class="lb">年間優待価値（推定）</div>
@@ -1151,7 +1151,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-17d';
+const APP_BUILD='2026-10-18a';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
@@ -2656,11 +2656,19 @@ function stockNavBack(){
 }
 
 function showMonth(mIdx){
+  if(!window.__buildCal) return;
+  mIdx = ((mIdx%12)+12)%12;
   const now = window.__now, eligOnly = $('eligOnly').checked;
   const cal = window.__buildCal(eligOnly);
   const c = cal[mIdx];
   const divSum = c.div.reduce((s,x)=>s+x.amt,0);
-  let html = '<h3>'+(mIdx+1)+'月の優待・配当</h3><div class="sub">配当支払は「権利確定月＋3ヶ月」の概算。実際の支払月・金額は銘柄により前後します。</div>';
+  const isNow = now && mIdx===now.getMonth();
+  const yutaiN = c.yutai.length;
+  let html = '<h3>'+(mIdx+1)+'月の優待・配当'+(isNow?' <span class="tag">今月</span>':'')+'</h3>'
+    + monthNav('showMonth(__M__-1)', mIdx+1).replace('margin-top:14px;border-top:1px solid var(--line);padding-top:10px;','margin:6px 0 8px;')
+    + '<div class="grid2" style="gap:8px;margin-bottom:6px;"><div style="background:#F5F7FD;border-radius:10px;padding:8px 10px;"><div class="tm-label">🎁 権利確定</div><div style="font-size:18px;font-weight:900">'+yutaiN+'銘柄</div></div>'
+    + '<div style="background:#EEF8F2;border-radius:10px;padding:8px 10px;"><div class="tm-label">💰 配当支払（目安）</div><div style="font-size:18px;font-weight:900">'+yen(divSum)+'</div></div></div>'
+    + '<div class="sub">配当支払は「権利確定月＋3ヶ月」の概算。実際の支払月・金額は銘柄により前後します。</div>';
   html += '<h4 style="font-size:13px;font-weight:900;margin:10px 0 4px;">🎁 権利確定する優待（'+c.yutai.length+'銘柄）</h4>';
   if(c.yutai.length){
     html += c.yutai.map(x=>{
