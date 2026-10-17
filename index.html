@@ -1150,6 +1150,22 @@ canvas{max-width:100%;}
 </div>
 
 <script>
+/* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
+const APP_BUILD='2026-10-17b';
+(function(){
+  try{
+    fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
+      const m=t.match(/const APP_BUILD='([^']+)'/);
+      if(!m||m[1]===APP_BUILD) return;
+      let tried=''; try{tried=sessionStorage.getItem('nosBuildTry')||'';}catch(e){}
+      if(tried===m[1]) return;
+      try{sessionStorage.setItem('nosBuildTry',m[1]);}catch(e){}
+      const u=new URL(location.href); u.searchParams.set('v',m[1]); location.replace(u.toString());
+    }).catch(()=>{});
+  }catch(e){}
+})();
+</script>
+<script>
 const $ = id => document.getElementById(id);
 const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
 const man = n => (n/10000).toLocaleString('ja-JP',{maximumFractionDigits:0}) + '万';
