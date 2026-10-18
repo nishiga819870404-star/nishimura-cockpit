@@ -448,6 +448,10 @@ canvas{max-width:100%;}
 
     <!-- ===== page: summary ===== -->
     <section id="p-summary" class="hidden">
+      <div class="card clickable" id="fireCard" onclick="showFire()" style="border:1.5px solid #F5B38A;background:linear-gradient(135deg,#FFF3EA,#FFFFFF)">
+        <h2>🔥 FIRE計画（50歳まで） <span class="tag">タップで詳しく</span></h2>
+        <div id="fireSum" style="font-size:13px;line-height:1.8">—</div>
+      </div>
       <div class="card">
         <h2>純資産 <span class="tag" id="snap-date">—</span></h2>
         <div class="formula">
@@ -553,6 +557,11 @@ canvas{max-width:100%;}
         <h2>月別 支出の内訳 <span class="tag" id="stackYearTag"></span> <span class="tag">積み上げ</span></h2>
         <canvas id="cfStackChart" height="280"></canvas>
         <div class="note">各月の棒を費目で色分け。棒の高さ＝その月の総支出、色の割合＝内訳。収入は黒い折れ線で重ねています。</div>
+      </div>
+
+      <div class="card clickable" onclick="showUtilities()" title="タップで毎月の推移">
+        <h2>🔌 光熱費・通信の推移 <span class="tag">タップで毎月</span></h2>
+        <div id="utilSum" style="font-size:13px;line-height:1.8">—</div>
       </div>
 
       <div class="card">
@@ -1161,7 +1170,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-18d';
+const APP_BUILD='2026-10-18e';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
@@ -1568,12 +1577,34 @@ const RECLASS = [
  ['外食',['名古屋駅店舗','東京ソラマチ','イトーヨーカドー専門店','東武百貨店']],
  ['趣味・娯楽',['ﾔﾌ-','BSBショップス','セレクション','Ａｍａｚｏｎ　Ｄｏｗｎｌｏａｄｓ']],
 ];
+/* 購入明細のカテゴリ（2026-10 全面整理：店名・品名から自動で決める。カード名だけのカテゴリも分類し直す） */
+const CAT2 = [
+  ['投資',[/楽天キャッシュ/,/投信積立/]],
+  ['光熱費',[/ガス(?!ト)/,/水道|スイドウ|ｽｲﾄﾞｳ/,/電気|でんき|電力|ＴＥＰＣＯ|TEPCO/]],
+  ['通信',[/ＫＤＤＩ|KDDI|ｐｏｖｏ|povo|楽天モバイル|ソフトバンク|ドコモ|docomo/i]],
+  ['サブスク・AI',[/ANTHROPIC|CLAUDE|ＣＬＡＵＤＥ|OpenAI|ChatGPT|GENSPARK|ＡＰＰＬＥ　ＣＯＭ|APPLE COM|YouTube|Netflix|Spotify|Ｇｏｏｇｌｅ|Google/i]],
+  ['運動・健康',[/コナミ|ジム|パーソナル|整体|クリニック|病院|医院/]],
+  ['ドラッグストア',[/くすり|薬|ウエルシア|マツモトキヨシ|マツキヨ|サンドラッグ|ツルハ/]],
+  ['ふるさと納税',[/^(大分県|大阪府|茨城県|静岡県|北海道|宮崎県|山形県)|ふるさと/]],
+  ['コンビニ',[/セブン|ローソン|ファミリーマート|ファミマ|ミニストップ|デイリーヤマザキ|ＮｅｗＤａｙｓ/]],
+  ['スーパー',[/生鮮市場|ＴＯＰ|TOP|オーケー|業務ス|ベルクス|ジェーソン|イオン(?!シネマ)|ヨーカドー|西友|ライフ|マルエツ|アタック|アエナ/]],
+  ['外食',[/寿司|すき家|吉野家|なか卯|ガスト|魚べい|焼肉|蕎麦|そば|日高屋|マクドナルド|出前館|ラーメン|スターバックス|ドトール|大戸屋|五右衛門|酒場|定食|食堂|ＡｍａｚｏｎＰａｙ提携/]],
+  ['交通',[/Suica|ＳＵＩＣＡ|Ｓｕｉｃａ|オートチャージ|えきねっと|スマートＥＸ|スマートEX|ＪＲ|タクシー|ＧＯ　|新幹線/]],
+  ['服・ファッション',[/ユニクロ|ＧＵ|GU |ワークマン|モンベル|mont-bell|ＳＴＲＥＥＴ|セカンドストリート|WEIRDO|WIRDO|GLAD HAND|GAZZO|ＧＡＺＺＯ|topologie|Topologie|トポロジー|On Cloud|ゾゾ|ｿﾞｿﾞ|BAZZSTORE|ＢＡＺＺＳＴＯＲＥ|Funning|Ｆｕｎｎｉｎｇ|千葉鑑定団|ＲＥＺＡＲ|カバン|デニム|帽子|スニーカー/]],
+  ['趣味・グッズ',[/一番くじ|ポケモン|バンダイ|ホビー|ちいかわ|新星堂|ドラゴンボール|フリーレン|MLB|ピクサー|ヤフーフリマ|DMM|ﾃﾞｲ-ｴﾑｴﾑ|あみあみ|ブックオフ|上野くん|全巻|イオンシネマ|映画/]],
+  ['家電・ガジェット',[/Anker|MacBook|iPad|Hamee|ビックカメラ|ヨドバシ|Plaud|ＪＩＮＳ|JINS/]],
+  ['住まい・日用品',[/カギ|MOMO|収納|ニトリ|コーナン商事|ダイソー|百貨店|ヒツジ|枕|インテリア|くらしのマーケット/]],
+  ['ネット通販',[/ＡＭＡＺＯＮ|AMAZON|Amazon|アマゾン/]],
+];
+const CAT_ALIAS = {'公共料金':'光熱費','運動':'運動・健康','趣味・娯楽':'趣味・グッズ','趣味':'趣味・グッズ','ファッション':'服・ファッション','日用品':'住まい・日用品','家具・インテリア':'住まい・日用品','修理・保全':'住まい・日用品'};
+const CARD_CATS = /^(三井住友ゴールド|Amazonカード|メルカード|楽天カード|Suicaカード|ー|支払方法|チャージ・決済|)$/;
 function catOverride(text, cat){
-  /* 強制ルール: 楽天キャッシュチャージはNISA積立の一部(月5万×2系統で計10万)なので「投資」に統一 */
-  if(String(text).includes('楽天キャッシュ')) return '投資';
-  if(cat && cat!=='その他') return cat; /* 手動分類済みは尊重、その他だけ再分類 */
-  for(const [c,keys] of RECLASS){ if(keys.some(k=>String(text).includes(k))) return c; }
-  return cat||'その他';
+  const t=String(text||'');
+  for(const [c,res] of CAT2){ if(res.some(re=>re.test(t))) return c; }
+  for(const [c,keys] of RECLASS){ if(keys.some(k=>t.includes(k))) return CAT_ALIAS[c]||c; }
+  cat=String(cat||'').trim();
+  if(CARD_CATS.test(cat)) return 'その他';
+  return CAT_ALIAS[cat]||cat||'その他';
 }
 
 function bigCat(item){
@@ -1910,7 +1941,7 @@ function render(d){
 const _payNew=(r[6]||'').trim();
         const _pay=_payNew||r[4]||'';
         const _catRaw=_payNew?(r[4]||''):(r[5]||'');
-        window.__meisai.push({y:dt.y,m:dt.m,store:r[1]||'',item:r[2],amt,pay:_pay,cat:catOverride((r[1]||'')+' '+(r[2]||''), _catRaw||'その他')});
+        window.__meisai.push({y:dt.y,m:dt.m,store:r[1]||'',item:r[2],amt,pay:_pay,src:String(r[7]||''),cat:catOverride((r[1]||'')+' '+(r[2]||''), _catRaw||'その他')});
     }
   }
 
@@ -2104,6 +2135,8 @@ const _payNew=(r[6]||'').trim();
   renderCal();
   renderYtd();
   try{ renderReview(); }catch(e){}
+  try{ renderUtil(); }catch(e){}
+  try{ renderFire(); }catch(e){}
 
   /* holdings table (クリックで個別モーダル) */
   window.__divHist = parseDivHist(d.hist);
@@ -2462,6 +2495,106 @@ function showLakePlan(){
   openModal(html);
 }
 
+/* ===== 🔌 光熱費・通信（購入明細のカテゴリから） ===== */
+function utilKind(r){
+  const t=(r.store||'')+' '+(r.item||'');
+  if(/ガス(?!ト)/.test(t)) return 'ガス(京葉ガス)';
+  if(/水道|スイドウ|ｽｲﾄﾞｳ/.test(t)) return '水道';
+  if(/電気|でんき|電力/.test(t)) return '電気';
+  if(r.cat==='通信') return '通信(スマホ)';
+  return null;
+}
+function utilData(){
+  const by={}, seen=new Set();
+  (window.__meisai||[]).forEach(r=>{ if(r.cat!=='光熱費'&&r.cat!=='通信') return; if(/^利用日:/.test(r.src||'')) return;
+    const dk=[r.y,r.m,r.store,r.amt].join('|'); if(seen.has(dk)) return; seen.add(dk); /* 同じ月・店・金額の重複登録は1回に */ /* 請求月に付け直した重複行は除く */ const k=utilKind(r); if(!k) return;
+    const key=r.y+'-'+String(r.m).padStart(2,'0'); (by[key]=by[key]||{})[k]=(by[key][k]||0)+r.amt; });
+  return by;
+}
+function renderUtil(){
+  const el=$('utilSum'); if(!el) return;
+  const by=utilData(), ks=Object.keys(by).sort();
+  if(!ks.length){ el.innerHTML='<span style="color:var(--dim)">カード明細の取り込み待ち</span>'; return; }
+  const last=ks[ks.length-1], prev=ks.slice(-7,-1);
+  const tot=k=>Object.values(by[k]||{}).reduce((s,v)=>s+v,0);
+  const avg=prev.length?Math.round(prev.reduce((s,k)=>s+tot(k),0)/prev.length):null;
+  const lm=+last.slice(5);
+  el.innerHTML=`${lm}月：<b>${yen(tot(last))}</b>${avg?`（いつも ${yen(avg)}・<b style="color:${tot(last)>avg?'var(--red)':'var(--green)'}">${signed(tot(last)-avg)}</b>）`:''}<br><span style="font-size:12px;color:var(--dim)">${Object.entries(by[last]).map(([k,v])=>k+' '+yen(v)).join('・')}</span>`;
+}
+function showUtilities(){
+  const by=utilData(), ks=Object.keys(by).sort();
+  const kinds=['ガス(京葉ガス)','電気','水道','通信(スマホ)'].filter(k=>ks.some(m=>by[m][k]));
+  let html=`<h3>🔌 光熱費・通信の推移</h3><div class="sub">カード明細・レシートの購入明細から自動で集計（利用日の月）。ガス代は季節で変わるので、去年の同じ月とも比べてください</div><canvas id="utilCanvas" height="190"></canvas>`;
+  html+=`<div style="overflow-x:auto;margin-top:8px;"><table class="t"><thead><tr><th>月</th>${kinds.map(k=>`<th style="text-align:right;font-size:10.5px;">${k}</th>`).join('')}<th style="text-align:right;">合計</th></tr></thead><tbody>`;
+  [...ks].reverse().forEach(m=>{ const t=kinds.reduce((s,k)=>s+(by[m][k]||0),0);
+    html+=`<tr><td style="white-space:nowrap;">${m.replace('-','/')}</td>${kinds.map(k=>`<td class="num" style="font-size:11.5px;">${by[m][k]?yen(by[m][k]):'—'}</td>`).join('')}<td class="num" style="font-weight:800;">${yen(t)}</td></tr>`; });
+  html+='</tbody></table></div><div class="note">電気代がガスとまとめて「京葉ガス」で請求されている場合は、ガスの列に含まれます。電気を別の会社で払っていれば、その明細を送ると列が増えます。</div>';
+  openModal(html);
+  if(typeof Chart!=='undefined'){ const cols=['#F0A04B','#F5C542','#5AB6F2','#9B8AE0'];
+    charts['modalChart']=new Chart($('utilCanvas'),{type:'bar',data:{labels:ks.map(m=>m.slice(2).replace('-','/')),datasets:kinds.map((k,i)=>({label:k,data:ks.map(m=>by[m][k]||0),backgroundColor:cols[i%4],stack:'u'}))},options:{plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>man(v)}}}}}); }
+}
+
+/* ===== 🔥 FIRE計画（50歳＝2037年4月4日まで） ===== */
+const FIRE = {birth:'1987-04-04', fireAge:50, ret:0.04, rule:25};
+function fireData(){
+  const now=window.__now||new Date();
+  const exp=window.__cfRows||[];
+  const nowKey=cfMonthKey(now.getFullYear(),now.getMonth()+1);
+  const keys=[...new Set(exp.map(r=>cfMonthKey(r.y,r.m)))].filter(k=>k<nowKey).sort((a,b)=>b-a).slice(0,12);
+  if(!keys.length) return null;
+  const spendM=Math.round(keys.reduce((s,k)=>s+exp.filter(r=>cfMonthKey(r.y,r.m)===k&&!NOT_SPEND.test(r.item)&&!/レイク|借入/.test(r.item)).reduce((a,r)=>a+r.amt,0),0)/keys.length);
+  const recent=exp.filter(r=>keys.includes(cfMonthKey(r.y,r.m)));
+  const house=recent.some(r=>/住宅|家賃/.test(r.item))?0:64503;   /* 住宅ローン（購入61,391＋リフォーム3,112）は収支に入っていないので足す */
+  const yearSpend=(spendM+house)*12;
+  const target=yearSpend*FIRE.rule;
+  const sn=window.__snaps||[], lt=sn[sn.length-1];
+  const assets=lt?lt.net:0;
+  const hs=window.__holdings||[];
+  const divNet=hs.reduce((s,h)=>s+(h.divNet||0),0), divGross=hs.reduce((s,h)=>s+(h.divTotal||0),0);
+  const b=new Date(FIRE.birth), fireDate=new Date(b.getFullYear()+FIRE.fireAge,b.getMonth(),b.getDate());
+  const age=now.getFullYear()-b.getFullYear()-((now.getMonth()<b.getMonth()||(now.getMonth()===b.getMonth()&&now.getDate()<b.getDate()))?1:0);
+  const months=Math.max(1,Math.round((fireDate-now)/(30.44*864e5)));
+  const r=Math.pow(1+FIRE.ret,1/12)-1;
+  const fvNow=assets*Math.pow(1+r,months);
+  const need=Math.max(0,target-fvNow);
+  const pmt=need>0?Math.round(need*r/(Math.pow(1+r,months)-1)):0;
+  const divTarget=divNet>0&&hs.length?Math.round(yearSpend/(divNet/hs.reduce((s,h)=>s+h.value,0))):null;
+  return {age,months,spendM,house,yearSpend,target,assets,progress:assets/target,divNet,divGross,divCover:divNet/yearSpend,pmt,fvNow,divTarget,fireDate};
+}
+function renderFire(){
+  const el=$('fireSum'); if(!el) return; const f=fireData();
+  if(!f){el.textContent='収支データ待ち';return;}
+  el.innerHTML=`必要な資産の目安 <b>${man(f.target)}円</b>（生活費 年${man(f.yearSpend)}円×25）<br>
+    今 <b>${man(f.assets)}円</b> → 達成率 <b style="color:var(--header)">${Math.round(f.progress*100)}%</b>・50歳まであと${Math.floor(f.months/12)}年${f.months%12}ヶ月<br>
+    配当（手取り）年${man(f.divNet)}円＝生活費の<b>${Math.round(f.divCover*100)}%</b>・必要な積立 月<b>${yen(f.pmt)}</b>（年4%運用の場合）`;
+}
+function showFire(){
+  const f=fireData(); if(!f) return;
+  const rows=[
+    ['今の年齢',f.age+'歳（50歳の誕生日：'+f.fireDate.getFullYear()+'/'+(f.fireDate.getMonth()+1)+'/'+f.fireDate.getDate()+'）'],
+    ['毎月の生活費（直近12ヶ月平均）',yen(f.spendM)+'＋住宅ローン'+yen(f.house)],
+    ['年間の生活費',yen(f.yearSpend)],
+    ['FIREに必要な資産（4%ルール＝×25）','<b>'+yen(f.target)+'</b>'],
+    ['今の純資産（住宅ローン除く）',yen(f.assets)+'（達成率 '+Math.round(f.progress*100)+'%）'],
+    ['今の資産を年4%で運用すると50歳で',yen(Math.round(f.fvNow))],
+    ['足りない分を埋める毎月の積立','<b>'+yen(f.pmt)+'</b>'],
+    ['今の配当（手取り・年）',yen(f.divNet)+'（税引前 '+yen(f.divGross)+'）＝生活費の'+Math.round(f.divCover*100)+'%'],
+    ['配当だけで暮らすのに必要な株（今の利回りのまま）',f.divTarget?yen(f.divTarget):'—'],
+  ];
+  let html=`<h3>🔥 FIRE計画（50歳まで）</h3><div class="sub">収支・資産・保有株のデータから毎月自動で計算します。前提：年4%で運用・4%ルール（資産の4%ずつ取り崩しても長く続く目安）・インフレと税・年金は考えていない概算</div>`;
+  html+=rows.map(([k,v])=>`<div class="mrow"><div style="flex:1;font-size:12.5px;">${k}</div><div class="amt" style="text-align:right;">${v}</div></div>`).join('');
+  html+=`<h4 style="font-size:13px;font-weight:900;margin:14px 0 4px;">💡 FPメモ</h4><div style="font-size:12.5px;line-height:1.8">`+fireTips(f).map(t=>'・'+t).join('<br>')+'</div>';
+  openModal(html);
+}
+function fireTips(f){
+  const t=[];
+  if(f.pmt>0) t.push(`50歳でFIREするには、今の資産の運用に加えて毎月${yen(f.pmt)}の積立が必要です。今のNISA積立（約10万円）との差を、ボーナスや株の利益確定で埋めていきましょう`);
+  t.push(`生活費を月1万円減らすと、必要な資産は${man(120000*FIRE.rule)}円減ります。固定費（サブスク・通信・ジム）の見直しがいちばん効きます`);
+  if(f.divCover<0.5) t.push(`配当は生活費の${Math.round(f.divCover*100)}%。NISAで高配当株を増やすと非課税で配当が伸び、取り崩しに頼らないFIREに近づきます`);
+  t.push('レイク（約97万円）は利息が付く前に3月までに完済。借入をゼロにしてから積立を増やすのが近道です');
+  return t;
+}
+
 /* ===== 先月の振り返り（今日タブの上・月次収支から自動で作る） ===== */
 const NOT_SPEND = /NISA|積立|投信/;   /* 投資の積立は「使ったお金」から外す */
 function cfMonthKey(y,m){return y*12+m;}
@@ -2506,6 +2639,7 @@ function renderReview(){
   r.ups.forEach(x=>L.push(`⚠️ <b>${x.item}</b> がいつもの${(x.amt/Math.max(1,x.avg)).toFixed(1)}倍（${signed(x.diff)}）`));
   if(r.downs.length) L.push('👍 減ったもの：'+r.downs.map(x=>`${x.item} ${signed(x.diff)}`).join('・'));
   if(r.net&&r.net.prev!==null) L.push(`🏦 純資産 ${yen(r.net.now)}（${r.net.pm}月→${r.net.m}月 ${signed(r.net.now-r.net.prev)}）`);
+  try{ const f=fireData(); if(f) L.push(`🔥 FIRE達成率 <b>${Math.round(f.progress*100)}%</b>（必要 ${man(f.target)}円・50歳まで あと${Math.floor(f.months/12)}年）`); }catch(e){}
   /* 今月どう気をつけるか */
   const tips=[];
   if(bal<0) tips.push(`先月は支出が収入を${yen(-bal)}上回りました。今月は「使ったお金」を${yen(Math.max(0,r.tInc-r.tInvest))}以内に`);

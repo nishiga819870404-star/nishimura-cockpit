@@ -412,7 +412,7 @@ function sheetValues_(key) {
                {op:'set', sheet:'port', matchCol:0, matchValue:'7203', set:{"3":"200","4":"2500"}}], text?}
    行の削除はしない（売り切ったら株数を0にする） */
 function sheetOps_(b) {
-  const allowed = { trades: 1, port: 1, snap: 1, cf: 1, loan: 1 };
+  const allowed = { trades: 1, port: 1, snap: 1, cf: 1, loan: 1, meisai: 1 };
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const done = [];
   (b.ops || []).forEach(function (o) {
@@ -426,6 +426,13 @@ function sheetOps_(b) {
         const ck = function (r) { return [r[0], r[1], r[2], String(r[3]).replace(/,/g, '')].map(function (x) { return String(x == null ? '' : x).trim(); }).join('|'); };
         const k2 = ck(o.values);
         if (c0.some(function (r) { return ck(r) === k2; })) { done.push(SHEETS[o.sheet] + 'は同じ行があるので追加せず'); return; }
+      }
+      if (o.sheet === 'meisai') {
+        /* 購入明細は 日付・店舗・金額・出典 が同じ行があれば二重に入れない */
+        const m0 = sh.getDataRange().getDisplayValues();
+        const mk = function (r) { return [r[0], r[1], String(r[3]).replace(/,/g, ''), r[7]].map(function (x) { return String(x == null ? '' : x).trim(); }).join('|'); };
+        const k3 = mk(o.values);
+        if (m0.some(function (r) { return mk(r) === k3; })) { done.push(SHEETS[o.sheet] + 'は同じ行があるので追加せず'); return; }
       }
       if (o.sheet === 'port') {
         const v0 = sh.getDataRange().getDisplayValues();
