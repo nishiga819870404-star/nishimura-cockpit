@@ -2505,8 +2505,9 @@ function utilKind(r){
   return null;
 }
 function utilData(){
-  const by={};
-  (window.__meisai||[]).forEach(r=>{ if(r.cat!=='光熱費'&&r.cat!=='通信') return; if(/^利用日:/.test(r.src||'')) return; /* 請求月に付け直した重複行は除く */ const k=utilKind(r); if(!k) return;
+  const by={}, seen=new Set();
+  (window.__meisai||[]).forEach(r=>{ if(r.cat!=='光熱費'&&r.cat!=='通信') return; if(/^利用日:/.test(r.src||'')) return;
+    const dk=[r.y,r.m,r.store,r.amt].join('|'); if(seen.has(dk)) return; seen.add(dk); /* 同じ月・店・金額の重複登録は1回に */ /* 請求月に付け直した重複行は除く */ const k=utilKind(r); if(!k) return;
     const key=r.y+'-'+String(r.m).padStart(2,'0'); (by[key]=by[key]||{})[k]=(by[key][k]||0)+r.amt; });
   return by;
 }
