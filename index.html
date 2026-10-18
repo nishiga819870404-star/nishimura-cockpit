@@ -449,7 +449,7 @@ canvas{max-width:100%;}
     <!-- ===== page: summary ===== -->
     <section id="p-summary" class="hidden">
       <div class="card clickable" id="fireCard" onclick="showFire()" style="border:1.5px solid #F5B38A;background:linear-gradient(135deg,#FFF3EA,#FFFFFF)">
-        <h2>🔥 FIRE計画（50歳まで・サイドFIRE） <span class="tag">タップで詳しく</span></h2>
+        <h2>🔥 FIRE計画（45歳でサイドFIRE） <span class="tag">タップで詳しく</span></h2>
         <div id="fireSum" style="font-size:13px;line-height:1.8">—</div>
       </div>
       <div class="card">
@@ -1170,7 +1170,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-18f';
+const APP_BUILD='2026-10-18g';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
@@ -2534,9 +2534,9 @@ function showUtilities(){
     charts['modalChart']=new Chart($('utilCanvas'),{type:'bar',data:{labels:ks.map(m=>m.slice(2).replace('-','/')),datasets:kinds.map((k,i)=>({label:k,data:ks.map(m=>by[m][k]||0),backgroundColor:cols[i%4],stack:'u'}))},options:{plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>man(v)}}}}}); }
 }
 
-/* ===== 🔥 FIRE計画（50歳＝2037年4月4日まで）。本命はサイドFIRE（週3バイトで社会保険に入り、足りない分を資産から） ===== */
-const FIRE = {birth:'1987-04-04', fireAge:50, rule:25};
-const FIRE_DEF = {live:250000, work:80000, ret:4};   /* FIRE後の生活費(月・住宅ローン込み)／バイト手取り(月)／運用利回り(%) */
+/* ===== 🔥 FIRE計画（45歳＝2032年4月4日まで）。本命はサイドFIRE（週3バイトで社会保険に入り、足りない分を資産から） ===== */
+const FIRE = {birth:'1987-04-04', fireAge:45, rule:25};   /* 2026-10-18 本人決定：45歳でサイドFIRE（宅建を活かした週3バイト） */
+const FIRE_DEF = {live:250000, work:120000, ret:4};   /* FIRE後の生活費(月・住宅ローン込み)／バイト手取り(月)／運用利回り(%) */
 function fireCfg(){ let c={}; try{c=JSON.parse(localStorage.getItem('fireCfg')||'{}');}catch(e){} return Object.assign({},FIRE_DEF,c); }
 function setFireCfg(k,v){ const c=fireCfg(); c[k]=Number(v)||0; try{localStorage.setItem('fireCfg',JSON.stringify(c));}catch(e){} renderFire(); showFire(); try{renderReview();}catch(e){} }
 function fvMonths(pv,r,n){return pv*Math.pow(1+r,n);}
@@ -2573,7 +2573,7 @@ function fireData(){
 function renderFire(){
   const el=$('fireSum'); if(!el) return; const f=fireData();
   if(!f){el.textContent='収支データ待ち';return;}
-  el.innerHTML=`<b>サイドFIRE（週3バイト）</b>に必要な資産 <b>${man(f.sideTarget)}円</b><br>
+  el.innerHTML=`<b>45歳でサイドFIRE（週3・宅建バイト）</b>に必要な資産 <b>${man(f.sideTarget)}円</b><br>
     今 <b>${man(f.assets)}円</b> → 達成率 <b style="color:var(--header)">${Math.min(999,Math.round(f.progress*100))}%</b>・`+
     (f.reachM===0?'<b style="color:var(--green)">もう届いています</b>':f.reachAge!==null?`積立なしでも約<b>${f.reachAge}歳</b>で到達（年${f.cfg.ret}%運用）`:'—')+`<br>
     <span style="font-size:12px;color:var(--dim)">生活費 月${man(f.cfg.live)}円−バイト手取り月${man(f.cfg.work)}円＝資産から年${man(f.sideNeedY)}円。配当（手取り）年${man(f.divNet)}円でその${Math.round(f.divCover*100)}%</span>`;
@@ -2582,12 +2582,12 @@ function showFire(){
   const f=fireData(); if(!f) return;
   const inp=(k,label,unit,step)=>`<label style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;margin:4px 0;">${label}<span><input type="number" step="${step}" value="${f.cfg[k]}" onchange="setFireCfg('${k}',this.value)" style="width:100px;padding:5px 6px;border:1px solid var(--line);border-radius:8px;text-align:right;font-size:13px;"> ${unit}</span></label>`;
   const row=(k,v)=>`<div class="mrow"><div style="flex:1;font-size:12.5px;">${k}</div><div class="amt" style="text-align:right;">${v}</div></div>`;
-  let html=`<h3>🔥 FIRE計画（50歳まで）</h3><div class="sub">本命はサイドFIRE：週3くらいのバイトで社会保険に入り、足りない生活費を資産（配当＋取り崩し）でまかなう形。数字は毎月の収支・資産・保有株から自動で計算します</div>`;
-  html+=`<div style="background:#F5F7FD;border-radius:12px;padding:8px 12px;margin:10px 0;"><div style="font-size:12px;font-weight:800;margin-bottom:2px;">前提（変えるとすぐ計算し直します）</div>${inp('live','FIRE後の生活費（月・住宅ローン込み）','円',10000)}${inp('work','バイトの手取り（月）','円',10000)}${inp('ret','運用の利回り（年）','%',0.5)}</div>`;
+  let html=`<h3>🔥 FIRE計画（45歳でサイドFIRE）</h3><div class="sub">本命はサイドFIRE：宅建を活かした週3（1日8時間）のバイトで社会保険に入り、足りない生活費を資産（配当＋取り崩し）でまかなう形。数字は毎月の収支・資産・保有株から自動で計算します</div>`;
+  html+=`<div style="background:#F5F7FD;border-radius:12px;padding:8px 12px;margin:10px 0;"><div style="font-size:12px;font-weight:800;margin-bottom:2px;">前提（変えるとすぐ計算し直します）</div>${inp('live','FIRE後の生活費（月・住宅ローン込み）','円',10000)}${inp('work','バイトの手取り（月・宅建士 時給1,500円×週24時間の目安）','円',10000)}${inp('ret','運用の利回り（年）','%',0.5)}</div>`;
   html+=`<h4 style="font-size:13px;font-weight:900;margin:12px 0 4px;">🌱 サイドFIRE（本命）</h4>`;
   html+=row('資産から出す生活費（年）',yen(f.sideNeedY))+row('必要な資産（×25）','<b>'+yen(f.sideTarget)+'</b>')+row('今の純資産（住宅ローン除く）',yen(f.assets)+'（'+Math.round(f.progress*100)+'%）')
     +row('積立なしで届く時期',f.reachM===0?'<b style="color:var(--green)">もう届いています</b>':f.reachDate?`<b>${f.reachDate.getFullYear()}年${f.reachDate.getMonth()+1}月ごろ（${f.reachAge}歳）</b>`:'—')
-    +row('50歳までに届かせる毎月の積立',f.pmtSide?yen(f.pmtSide):'<b style="color:var(--green)">0円（このままで届く）</b>')
+    +row('45歳までに届かせる毎月の積立',f.pmtSide?yen(f.pmtSide):'<b style="color:var(--green)">0円（このままで届く）</b>')
     +row('配当（手取り・年）でまかなえる割合',yen(f.divNet)+'＝'+Math.round(f.divCover*100)+'%');
   html+=`<h4 style="font-size:13px;font-weight:900;margin:14px 0 4px;">参考</h4>`;
   html+=row('完全FIRE（バイトなし・同じ生活費）',yen(f.fullTarget)+' → 毎月 '+yen(f.pmtFull))
@@ -2598,7 +2598,7 @@ function showFire(){
 }
 function fireTips(f){
   const t=[];
-  if(f.reachM===0) t.push('サイドFIREに必要な資産はもう届いています。あとは「借金ゼロ」と「生活費を前提どおりに下げられるか」が条件です');
+  if(f.reachM===0) t.push('45歳サイドFIREに必要な資産はもう届いています。あとは「借金ゼロ」と「生活費を前提どおりに下げられるか」が条件です');
   else if(f.reachAge!==null&&f.reachAge<=50) t.push(`今の資産を運用するだけで、${f.reachAge}歳ごろにサイドFIREの目安に届きます。毎月の積立を足せばもっと早まります`);
   t.push('週3バイトで社会保険に入るには、だいたい「週20時間以上・月8.8万円以上」が目安です（勤め先の規模で変わります）。年金・健康保険の負担がぐっと軽くなります');
   t.push(`いまの生活費（年${man(f.nowLiveY)}円）と前提（年${man(f.cfg.live*12)}円）の差が大きいほど、FIRE後に生活を切り替えられるかが鍵です。グッズ・服・パーソナルジムは「FIRE前に楽しむ枠」として毎月の上限を決めておくと安心です`);
