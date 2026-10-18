@@ -386,11 +386,6 @@ canvas{max-width:100%;}
         </div>
       </div>
 
-      <div class="card" id="reviewCard" style="display:none;cursor:pointer;border:1.5px solid #C9CEF0;background:linear-gradient(135deg,#F3F4FD,#FFFFFF)">
-        <h2>📝 <span id="reviewTitle">先月の振り返り</span> <span class="tag">タップで明細</span></h2>
-        <div id="reviewBody" style="font-size:13px;line-height:1.75"></div>
-      </div>
-
       <div class="card" onclick="__today.go('p-study')" style="cursor:pointer;background:linear-gradient(135deg,#FFF7E6,#FFFFFF);border:1.5px solid #F5D08A">
         <div style="display:flex;align-items:center;gap:12px">
           <div style="font-size:34px">📚</div>
@@ -444,14 +439,14 @@ canvas{max-width:100%;}
         <button onclick="__today.go('p-memo')">📝 メモ帳</button>
         <button onclick="__today.go('p-manual')">📖 使い方</button>
       </div>
+          <div class="card" id="reviewCard" style="display:none;cursor:pointer;border:1.5px solid #C9CEF0;background:linear-gradient(135deg,#F3F4FD,#FFFFFF)">
+        <h2>📝 <span id="reviewTitle">先月の振り返り</span> <span class="tag">タップで明細</span></h2>
+        <div id="reviewBody" style="font-size:13px;line-height:1.75"></div>
+      </div>
     </section>
 
     <!-- ===== page: summary ===== -->
     <section id="p-summary" class="hidden">
-      <div class="card clickable" id="fireCard" onclick="showFire()" style="border:1.5px solid #F5B38A;background:linear-gradient(135deg,#FFF3EA,#FFFFFF)">
-        <h2>🔥 FIRE計画（45歳でサイドFIRE） <span class="tag">タップで詳しく</span></h2>
-        <div id="fireSum" style="font-size:13px;line-height:1.8">—</div>
-      </div>
       <div class="card">
         <h2>純資産 <span class="tag" id="snap-date">—</span></h2>
         <div class="formula">
@@ -536,6 +531,10 @@ canvas{max-width:100%;}
           <canvas id="stackChart" height="150"></canvas>
           <div class="note">毎月の棚卸しごとに層が積み上がります。青系＝現金・電子マネー、暖色系＝証券3社。</div>
         </div>
+      </div>
+          <div class="card clickable" id="fireCard" onclick="showFire()" style="border:1.5px solid #F5B38A;background:linear-gradient(135deg,#FFF3EA,#FFFFFF)">
+        <h2>🔥 FIRE計画（45歳でサイドFIRE） <span class="tag">タップで詳しく</span></h2>
+        <div id="fireSum" style="font-size:13px;line-height:1.8">—</div>
       </div>
     </section>
 
@@ -1170,7 +1169,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-18g';
+const APP_BUILD='2026-10-18h';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
