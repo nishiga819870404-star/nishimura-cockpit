@@ -1169,7 +1169,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-18h';
+const APP_BUILD='2026-10-30b';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
@@ -3270,7 +3270,9 @@ window.__yotei = fetch('./yotei.json?ts='+Date.now())
   }
   function todayItems(){
     const t=tstr();
-    return shopAll().filter(x=>!x.done&&(x.date===t||(x.date&&x.date<t)||(!x.date&&x.kind==='forgot')))
+    /* 予定・発売・予約は日付が過ぎたら自動で消す（終わったイベント）。買い物・やることは済にするまで残す */
+    const EVENT={plan:1,release:1,reserve:1};
+    return shopAll().filter(x=>!x.done&&(x.date===t||(x.date&&x.date<t&&!EVENT[x.kind])||(!x.date&&x.kind==='forgot')||(x.kind==='forgot'&&x.date&&x.date<t)))
       .sort((a,b)=>(a.date||'9999')<(b.date||'9999')?-1:1);
   }
   function penguin(items, si){
