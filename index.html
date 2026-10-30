@@ -279,6 +279,12 @@ canvas{max-width:100%;}
   <div class="card">
     <h2>初期設定（2つ入れるだけ）</h2>
     <p><b>① 受付窓口URL</b>と<b>② 合言葉</b>を入れてください。作り方は <a href="https://github.com/nishiga819870404-star/nishimura-cockpit/blob/main/gas/README.md" target="_blank">gas/README.md</a>。<br>一度起動したら ⚙設定 の「🔗 復元リンクをコピー」で保存しておけば、次からは<b>そのリンクを開くだけ</b>で元どおりになります。</p>
+    <div style="background:#EEF8F2;border:1.5px solid #9ED9BE;border-radius:12px;padding:10px 12px;margin:8px 0 14px;">
+      <div style="font-weight:800;font-size:14px;">🔗 復元リンクがある人はここ（いちばん簡単）</div>
+      <div style="font-size:12px;color:var(--dim);margin:2px 0 6px;">LINEやメモに保存した復元リンクをコピーして、下に貼るか「貼り付けて復元」を押すだけ。ホーム画面のアイコンから開いているときも、この方法で戻せます。</div>
+      <input id="u-restore" placeholder="https://nishiga…github.io/nishimura-cockpit/#… を貼る">
+      <button class="go" id="restoreGo" type="button" style="background:var(--green);margin-top:6px;">📋 貼り付けて復元</button>
+    </div>
     <label>① 受付窓口URL（https://script.google.com/macros/s/…/exec）</label>
     <input id="u-gas" placeholder="https://script.google.com/macros/s/.../exec">
     <label>② 合言葉</label>
@@ -1169,7 +1175,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-30c';
+const APP_BUILD='2026-10-30d';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
@@ -1269,6 +1275,7 @@ let CFG = readCfg();
 if(CFG){ $('setup').classList.add('hidden'); boot(); }
 $('go').addEventListener('click',()=>{
   const gas=$('u-gas').value.trim(), key=$('u-key').value.trim();
+  { const c=cfgFromLink(gas); if(c){ CFG=c; writeCfg(c); $('setup').classList.add('hidden'); boot(); return; } }
   if(gas){
     if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(gas)){alert('受付窓口URLは https://script.google.com/…/exec の形です');return;}
     if(!key){alert('合言葉を入れてください');return;}
@@ -1279,6 +1286,19 @@ $('go').addEventListener('click',()=>{
   if(!c.snap||!c.cf||!c.port){alert('受付窓口URLと合言葉を入れてください（旧方式なら必須3つのCSV URL）');return;}
   CFG=c;writeCfg(c);$('setup').classList.add('hidden');boot();
 });
+/* 復元リンク（…#ハッシュ）を貼って戻す。ホーム画面アプリはリンクを開いても別の保存場所になるため、貼り付けで戻せるようにする */
+function cfgFromLink(t){
+  t=String(t||'').trim(); const i=t.indexOf('#'); if(i<0) return null;
+  try{ const c=JSON.parse(decodeURIComponent(atob(t.slice(i+1)))); return (c&&(c.gas||c.snap))?c:null; }catch(e){ return null; }
+}
+$('restoreGo').addEventListener('click',async()=>{
+  let t=$('u-restore').value.trim();
+  if(!t){ try{ t=await navigator.clipboard.readText(); }catch(e){} }
+  const c=cfgFromLink(t);
+  if(!c){ alert('復元リンクが読み取れませんでした。LINEなどから「…github.io/nishimura-cockpit/#…」のリンクをまるごとコピーして、上の欄に貼ってください'); return; }
+  CFG=c; writeCfg(c); $('setup').classList.add('hidden'); boot();
+});
+$('u-restore').addEventListener('input',()=>{ const c=cfgFromLink($('u-restore').value); if(c){ CFG=c; writeCfg(c); $('setup').classList.add('hidden'); boot(); } });
 $('reload').addEventListener('click',()=>{if(CFG)boot();});
 $('skipSetup').addEventListener('click',()=>{$('setup').classList.add('hidden');$('app').classList.remove('hidden');});
 $('copyRestore').addEventListener('click',async()=>{
