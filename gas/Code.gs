@@ -412,7 +412,7 @@ function sheetValues_(key) {
                {op:'set', sheet:'port', matchCol:0, matchValue:'7203', set:{"3":"200","4":"2500"}}], text?}
    行の削除はしない（売り切ったら株数を0にする） */
 function sheetOps_(b) {
-  const allowed = { trades: 1, port: 1, snap: 1, cf: 1, loan: 1, meisai: 1 };
+  const allowed = { trades: 1, port: 1, snap: 1, cf: 1, loan: 1, meisai: 1, watch: 1 };
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const done = [];
   (b.ops || []).forEach(function (o) {

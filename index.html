@@ -1169,7 +1169,7 @@ canvas{max-width:100%;}
 
 <script>
 /* 新しい版が公開されていたら自動で読み直す（ホーム画面・Safariが古い画面を覚えてしまう対策）。版を変えるときは APP_BUILD を書き換える */
-const APP_BUILD='2026-10-30b';
+const APP_BUILD='2026-10-30c';
 (function(){
   try{
     fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
@@ -3077,20 +3077,68 @@ function mdLite(s){
     return '<p>'+line+'</p>';
   }).join('');
 }
+/* 受付窓口へ書き込む（スプシ操作）。成功したらデータを読み直す */
+async function nosPost(body){
+  if(!CFG||!CFG.gas) throw new Error('受付窓口が未設定です');
+  const r=await fetch(CFG.gas,{method:'POST',body:JSON.stringify(Object.assign({key:CFG.key},body))});
+  let j=null; try{ j=JSON.parse(await r.text()); }catch(e){}
+  if(j&&j.ok===false) throw new Error(j.error||'失敗しました');
+  return j||{ok:true};
+}
 function renderWatch(w){
-  if(!w||w.length<2)return;
-  const rows=[];
-  for(let i=1;i<w.length;i++){const r=w[i]; if(!r[1])continue; rows.push({code:r[0]||'',name:r[1],month:r[2]||'',target:num(r[3]),targetRaw:r[3]||'',cur:num(r[4]),yutai:r[5]||'',memo:r[7]||''});}
-  if(!rows.length)return;
-  let html='<table class="t"><thead><tr><th>銘柄</th><th>権利月</th><th style="text-align:right;">目標</th><th style="text-align:right;">現在</th><th>判定</th></tr></thead><tbody>';
-  rows.forEach(r=>{
-    let judge='—';
-    if(r.target&&r.cur){ judge = r.cur<=r.target ? '<b style="color:var(--green)">🎯 目標圏内!</b>' : ('あと'+Math.round((r.cur-r.target)/r.target*100)+'%'); }
-    else if(!r.target) judge='<span style="color:var(--dim)">目標未設定</span>';
-    html+=`<tr><td><b>${r.name}</b><div class="dt">${r.code}${r.yutai?'・'+r.yutai:''}</div></td><td>${r.month}</td><td class="num">${r.target?yen(r.target):(r.targetRaw||'—')}</td><td class="num">${r.cur?yen(r.cur):'—'}</td><td>${judge}</td></tr>`;
-  });
-  html+='</tbody></table><div class="note">追加は「◯◯をウォッチに入れて、目標△円で」／分析は「◯◯どう思う？」。月次レーダーが目標圏内🎯と権利月接近👀を見張ります。</div>';
+  window.__watchRaw=w;
+  const held=new Set((window.__holdings||[]).map(h=>String(h.code||'').trim()).filter(Boolean));
+  const rows=[], hidden=[];
+  for(let i=1;i<(w||[]).length;i++){const r=w[i]; if(!r[1])continue;
+    const o={code:String(r[0]||'').trim(),name:r[1],month:r[2]||'',target:num(r[3]),targetRaw:r[3]||'',cur:num(r[4]),yutai:r[5]||'',memo:r[7]||''};
+    if(o.code&&held.has(o.code)) hidden.push(o); else rows.push(o);}
+  let html='';
+  if(rows.length){
+    html='<table class="t"><thead><tr><th>銘柄</th><th>権利月</th><th style="text-align:right;">目標</th><th style="text-align:right;">現在</th><th>判定</th><th></th></tr></thead><tbody>';
+    rows.forEach(r=>{
+      let judge='—';
+      if(r.target&&r.cur){ judge = r.cur<=r.target ? '<b style="color:var(--green)">🎯 目標圏内!</b>' : ('あと'+Math.round((r.cur-r.target)/r.target*100)+'%'); }
+      else if(!r.target) judge='<span style="color:var(--dim)">目標未設定</span>';
+      html+=`<tr><td><b>${r.name}</b><div class="dt">${r.code}${r.yutai?'・'+r.yutai:''}</div></td><td>${r.month}</td><td class="num">${r.target?yen(r.target):(r.targetRaw||'—')}</td><td class="num">${r.cur?yen(r.cur):'—'}</td><td>${judge}</td>
+        <td><button onclick="watchDone('${String(r.code||r.name).replace(/'/g,"\\'")}','${String(r.name).replace(/'/g,"\\'")}')" title="買った・もう狙わない" style="border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer;">✓ 外す</button></td></tr>`;
+    });
+    html+='</tbody></table>';
+  } else html='<div class="note">狙っている株はありません。</div>';
+  if(hidden.length) html+=`<div class="note">購入済みで自動的に外したもの：${hidden.map(h=>h.name).join('・')}</div>`;
+  html+=`<details style="margin-top:10px;"><summary style="cursor:pointer;font-weight:800;font-size:13px;">＋ 狙う株を追加する</summary>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
+      <input id="wAddCode" placeholder="銘柄コード（例 4732）" inputmode="numeric" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <input id="wAddName" placeholder="銘柄名（例 USS）" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <input id="wAddTarget" placeholder="目標株価（円・任意）" inputmode="numeric" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <input id="wAddMonth" placeholder="権利月（例 3月・任意）" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <input id="wAddMemo" placeholder="優待・メモ（任意）" style="grid-column:1/3;padding:8px;border:1px solid var(--line);border-radius:8px;">
+    </div>
+    <button onclick="watchAdd()" style="margin-top:8px;width:100%;background:var(--header);color:#fff;border:none;border-radius:10px;padding:10px;font-weight:800;cursor:pointer;">ウォッチに追加</button>
+    <div id="wAddMsg" style="font-size:12px;margin-top:6px;"></div></details>
+    <div class="note">ここで追加・外すとスプシのウォッチリストに保存されるので、どの端末でも同じです。現在株価と「目標圏内🎯」の判定は、毎月のレーダーで更新されます。銘柄の分析をしてほしいときはチャットで「◯◯どう思う？」。</div>`;
   $('watchList').innerHTML=html;
+}
+async function watchDone(code,name){
+  if(!confirm(name+' をウォッチリストから外しますか？')) return;
+  try{
+    await nosPost({type:'sheetOps',ops:[{op:'set',sheet:'watch',matchCol:/^\d{4}$/.test(code)?0:1,matchValue:code,set:{'0':'','1':'','2':'','3':'','4':'','5':'','6':'','7':''}}]});
+    const w=window.__watchRaw||[]; window.__watchRaw=w.filter((r,i)=>i===0||!(String(r[0]).trim()===code||r[1]===code));
+    renderWatch(window.__watchRaw);
+  }catch(e){ alert('外せませんでした：'+(e.message||e)+'\n受付窓口のコードが古い場合は、最新の Code.gs を貼り直してください'); }
+}
+async function watchAdd(){
+  const v=id=>($(id).value||'').trim(), msg=$('wAddMsg');
+  const code=v('wAddCode'), name=v('wAddName');
+  if(!code&&!name){ msg.textContent='銘柄コードか銘柄名を入れてください'; return; }
+  const d=new Date(), ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const row=[code,name||code,v('wAddMonth'),v('wAddTarget')||'【要記入】','',v('wAddMemo'),ds,'アプリから追加'];
+  msg.textContent='追加中…';
+  try{
+    await nosPost({type:'sheetOps',ops:[{op:'append',sheet:'watch',values:row}]});
+    window.__watchRaw=(window.__watchRaw&&window.__watchRaw.length?window.__watchRaw:[['銘柄コード','銘柄名','権利確定月','目標取得株価','現在株価(最終確認)','優待内容メモ','登録日','メモ']]).concat([row]);
+    renderWatch(window.__watchRaw);
+    const m=$('wAddMsg'); if(m) m.textContent='✅ '+(name||code)+' を追加しました';
+  }catch(e){ msg.textContent='⚠️ 追加できませんでした：'+(e.message||e)+'（受付窓口のコードが古い場合は最新の Code.gs を貼り直し）'; }
 }
 function renderWish(w){
   if(!w||w.length<2)return;
