@@ -407,12 +407,12 @@ function sheetValues_(key) {
   return sh ? sh.getDataRange().getDisplayValues() : null;
 }
 
-/* 定期実行（売買・配当レーダー）からのスプシ更新。書けるのはポートフォリオ・取引履歴・資産スナップショットだけ。
+/* 定期実行（売買・配当レーダー）やClaudeからのスプシ更新。書けるのは下の allowed のシートだけ（収入明細は2026-11追加）。
    {row?, ops:[{op:'append', sheet:'trades'|'port'|'snap', values:[...]},
                {op:'set', sheet:'port', matchCol:0, matchValue:'7203', set:{"3":"200","4":"2500"}}], text?}
    行の削除はしない（売り切ったら株数を0にする） */
 function sheetOps_(b) {
-  const allowed = { trades: 1, port: 1, snap: 1, cf: 1, loan: 1, meisai: 1, watch: 1 };
+  const allowed = { trades: 1, port: 1, snap: 1, cf: 1, loan: 1, meisai: 1, watch: 1, income: 1 };
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const done = [];
   (b.ops || []).forEach(function (o) {
@@ -433,6 +433,13 @@ function sheetOps_(b) {
         const mk = function (r) { return [r[0], r[1], String(r[3]).replace(/,/g, ''), r[7]].map(function (x) { return String(x == null ? '' : x).trim(); }).join('|'); };
         const k3 = mk(o.values);
         if (m0.some(function (r) { return mk(r) === k3; })) { done.push(SHEETS[o.sheet] + 'は同じ行があるので追加せず'); return; }
+      }
+      if (o.sheet === 'income') {
+        /* 収入明細は 支払年月・種別・項目・金額 が同じ行があれば二重に入れない */
+        const i0 = sh.getDataRange().getDisplayValues();
+        const ik = function (r) { return [r[0], r[2], r[4], String(r[5]).replace(/,/g, '')].map(function (x) { return String(x == null ? '' : x).trim(); }).join('|'); };
+        const k4 = ik(o.values);
+        if (i0.some(function (r) { return ik(r) === k4; })) { done.push(SHEETS[o.sheet] + 'は同じ行があるので追加せず'); return; }
       }
       if (o.sheet === 'port') {
         const v0 = sh.getDataRange().getDisplayValues();
